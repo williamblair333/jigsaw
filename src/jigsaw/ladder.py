@@ -42,13 +42,17 @@ class Decider(Protocol):
 
 
 def normalise(options: list[Option]) -> list[Option]:
-    """Min-max normalize options scores to 0..1.
+    """Scores on a 0..1 scale for the gate.
 
+    Scores already within 0..1 are kept: they're probabilities or utilities the game pack
+    calibrated, and min-max would turn any two options into 1.0 vs 0.0 and hide a close call.
+    Otherwise min-max to 0..1; if all scored options are equal, each gets 1.0.
     Options with no score remain None.
-    If all scored options are equal, each gets 1.0.
     """
     scored = [opt.score for opt in options if opt.score is not None]
     if not scored:
+        return [opt.model_copy() for opt in options]
+    if all(0.0 <= s <= 1.0 for s in scored):
         return [opt.model_copy() for opt in options]
 
     min_score = min(scored)
