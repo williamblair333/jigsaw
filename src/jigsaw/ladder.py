@@ -28,6 +28,9 @@ class Verdict(BaseModel):
     rung: int = Field(ge=0, le=7)
     reason: str
     primitives: list[dict[str, Any]] = Field(default_factory=list)
+    # the decision log's row id, set by Ladder.decide when it logs; the caller records the outcome
+    # against it (DecisionLog.set_outcome) once the decision has been carried out
+    decision_id: int | None = None
 
 
 @runtime_checkable
@@ -185,6 +188,6 @@ class Ladder:
                 choice=final_verdict.choice,
                 primitives=final_verdict.primitives,
             )
-            self.log.record(decision)
+            final_verdict = final_verdict.model_copy(update={"decision_id": self.log.record(decision)})
 
         return final_verdict

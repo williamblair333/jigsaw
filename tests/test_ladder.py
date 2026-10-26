@@ -567,3 +567,16 @@ def test_decision_log_one_row_per_decide(tmp_path: Path) -> None:
     assert d_nov.primitives == [{"p": 2}]
 
     log.close()
+
+
+def test_verdict_carries_the_logged_decision_id(tmp_path: Path) -> None:
+    log = DecisionLog(tmp_path / "decisions.db")
+    d1 = FakeDecider(rung=1, verdict=Verdict(choice="accept", rung=1, reason="rule"))
+    req = Request(game="g", turn=1, actor="a", kind="k", situation="s")
+    v = Ladder(deciders=[d1], gate=Gate(GateConfig(cadence=0)), log=log).decide(req)
+    assert v.decision_id is not None
+    log.set_outcome(v.decision_id, "clicked accept", turn=1)
+    assert log.get(v.decision_id).outcome == "clicked accept"
+    # without a log there is no row, so no id
+    assert Ladder(deciders=[d1], gate=Gate(GateConfig(cadence=0))).decide(req).decision_id is None
+    log.close()
