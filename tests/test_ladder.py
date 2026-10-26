@@ -85,6 +85,18 @@ def test_normalise_min_max_spread() -> None:
     assert norm[3].score is None
 
 
+def test_normalise_keeps_scores_already_on_the_unit_scale() -> None:
+    # min-max would make any two options 1.0 vs 0.0 and hide the close call
+    opts = [Option(name="accept", score=0.53), Option(name="decline", score=0.47)]
+    assert [o.score for o in normalise(opts)] == [0.53, 0.47]
+
+
+def test_a_two_option_close_call_escalates() -> None:
+    req = Request(game="g", turn=1, actor="a", kind="k", situation="s",
+                  options=[Option(name="accept", score=0.53), Option(name="decline", score=0.47)])
+    assert Gate().check(req, Verdict(choice="accept", rung=2, reason="r")).startswith("close call")
+
+
 def test_normalise_negative_scores() -> None:
     opts = [
         Option(name="neg", score=-10.0),
