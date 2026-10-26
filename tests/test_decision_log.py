@@ -256,3 +256,26 @@ def test_get_nonexistent_raises(tmp_path: Path) -> None:
     with DecisionLog(tmp_path / "test.db") as log:
         with pytest.raises(KeyError):
             log.get(999)
+
+
+def test_one_log_shared_by_many_threads(tmp_path):
+    # Parley answers each seat on its own thread with one shared log
+    import threading
+
+    log = DecisionLog(tmp_path / "shared.db")
+    created_in = threading.get_ident()
+    seen = []
+
+    def write(actor):
+        seen.append(threading.get_ident() != created_in)
+        for t in range(25):
+            log.record(Decision(game="g", turn=t, actor=actor, kind="build", situation="s", rung=7, choice="c"))
+
+    threads = [threading.Thread(target=write, args=(f"f{i}",)) for i in range(8)]
+    for th in threads:
+        th.start()
+    for th in threads:
+        th.join()
+    assert all(seen) and len(seen) == 8
+    assert len(log.query(game="g")) == 200 and log.rung_counts("g") == {7: 200}
+    log.close()

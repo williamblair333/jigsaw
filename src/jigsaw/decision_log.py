@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 import json
 from pathlib import Path
 import sqlite3
+import threading
 from typing import Any
 from pydantic import BaseModel, Field
 
@@ -42,14 +43,19 @@ class Decision(BaseModel):
 
 
 class DecisionLog:
-    """SQLite-backed decision log for recording and querying game decisions."""
+    """SQLite-backed decision log for recording and querying game decisions.
+
+    Safe to share between threads: a game loop that decides for several factions at once
+    (Parley answers each seat on its own thread) uses one log. One connection, one lock.
+    """
 
     def __init__(self, path: str | Path) -> None:
         """Open the decision log database at path and ensure schema exists."""
         if isinstance(path, (str, Path)) and str(path) != ":memory:":
             Path(path).parent.mkdir(parents=True, exist_ok=True)
         self._path = path
-        self._conn = sqlite3.connect(path)
+        self._lock = threading.RLock()
+        self._conn = sqlite3.connect(path, check_same_thread=False, timeout=30)
         self._conn.row_factory = sqlite3.Row
         self._init_db()
 
@@ -109,7 +115,7 @@ class DecisionLog:
         primitives_json = json.dumps(d.primitives)
         legality_json = json.dumps(d.legality)
 
-        with self._conn:
+        with self._lock, self._conn:
             cursor = self._conn.execute(
                 """
                 INSERT INTO decisions (
@@ -143,7 +149,7 @@ class DecisionLog:
 
     def set_outcome(self, id: int, outcome: str, turn: int | None = None) -> None:
         """Update the outcome and outcome turn for an existing decision."""
-        with self._conn:
+        with self._lock, self._conn:
             cursor = self._conn.execute(
                 "UPDATE decisions SET outcome = ?, outcome_turn = ? WHERE id = ?",
                 (outcome, turn, id),
@@ -153,8 +159,8 @@ class DecisionLog:
 
     def get(self, id: int) -> Decision:
         """Fetch a single decision by its ID."""
-        cursor = self._conn.execute("SELECT * FROM decisions WHERE id = ?", (id,))
-        row = cursor.fetchone()
+        with self._lock:
+            row = self._conn.execute("SELECT * FROM decisions WHERE id = ?", (id,)).fetchone()
         if row is None:
             raise KeyError(f"Decision with id {id} not found.")
         return self._row_to_decision(row)
@@ -190,20 +196,23 @@ class DecisionLog:
         where_clause = f"WHERE {' AND '.join(clauses)}" if clauses else ""
         query_sql = f"SELECT * FROM decisions {where_clause} ORDER BY id DESC"
 
-        cursor = self._conn.execute(query_sql, params)
-        return [self._row_to_decision(row) for row in cursor.fetchall()]
+        with self._lock:
+            rows = self._conn.execute(query_sql, params).fetchall()
+        return [self._row_to_decision(row) for row in rows]
 
     def rung_counts(self, game: str) -> dict[int, int]:
         """Return the count of decisions per rung for the specified game."""
-        cursor = self._conn.execute(
-            "SELECT rung, COUNT(*) FROM decisions WHERE game = ? GROUP BY rung",
-            (game,),
-        )
-        return {int(row[0]): int(row[1]) for row in cursor.fetchall()}
+        with self._lock:
+            rows = self._conn.execute(
+                "SELECT rung, COUNT(*) FROM decisions WHERE game = ? GROUP BY rung",
+                (game,),
+            ).fetchall()
+        return {int(row[0]): int(row[1]) for row in rows}
 
     def close(self) -> None:
         """Close the underlying SQLite connection."""
-        self._conn.close()
+        with self._lock:
+            self._conn.close()
 
     def __enter__(self) -> "DecisionLog":
         """Support context manager entry."""
