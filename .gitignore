@@ -1,0 +1,21 @@
+# Review queues (local only)
+_review/
+_reviewed/
+
+# Secrets (the repo goes public later)
+[.]env
+*[.]env
+
+# Runtime data
+runs/
+state/
+*.db
+*.sqlite
+*.sqlite3
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+*.egg-info/
