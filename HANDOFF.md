@@ -2,7 +2,8 @@
 
 ## 2026-10-26: decision log, ladder and gate built; MTW2 uses them
 
-**State:** main after the handoff PR. `just test` (34 pass). Private on Gitea (`bill/jigsaw`).
+**State:** main after the decision-id PR. `just test` (35 pass). `Verdict.decision_id` lets
+Parley record outcomes for steward decisions. Private on Gitea (`bill/jigsaw`).
 
 **Used by:** Parley (`/opt/proj/games/mtw2`) through a non-editable path dependency. After a
 change here, run `uv sync --reinstall-package jigsaw` in Parley. Before either repo goes public,

@@ -5,6 +5,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added (2026-10-26, later)
+- `Verdict.decision_id`: `Ladder.decide` sets it to the logged row's id, so the caller can record
+  the outcome (`DecisionLog.set_outcome`) once the decision is carried out. None without a log.
+
 ### Added (2026-10-26: the first day)
 - Repo skeleton and the design, `docs/specs/2026-10-26-jigsaw-design.md` (draft 2 after a referee
   review) (#1, #3).
