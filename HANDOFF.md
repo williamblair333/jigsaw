@@ -5,8 +5,8 @@
 **State:** `PRODUCT.md` and `STANDARDS.md` written on branch `docs/product-standards`, plus
 `examples/quickstart.py` and its test (36 tests pass). The first-run gate passes
 (`python3 /opt/proj/Uncle-J-s-Refinery/features/product-quality/first_run_gate.py .`);
-`standards_check.py --check .` is clean. The gate writes `.first-run-gate/` locally. It's
-untracked and should be added to `.gitignore`.
+`standards_check.py --check .` is clean. The gate writes `.first-run-gate/` locally (ignored).
+A Gemini referee caught one wrong status (`public-api-declared`: `__all__` already exists), now fixed.
 
 **Next:** work the top open gaps in STANDARDS.md, in order: `log-both-verdicts` (a new
 column, so do `schema-versioned` with it), `decider-failure-contained`, `full-request-replayable`.

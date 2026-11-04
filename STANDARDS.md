@@ -114,10 +114,10 @@ standards:
     evidence: DecisionLog.__init__ sets no journal_mode
   - id: public-api-declared
     area: release
-    bar: jigsaw/__init__.py exports the public API with __all__, and anything outside it can change without a major bump
+    bar: jigsaw/__init__.py exports the public API with __all__, and the README states that anything outside it can change without a major bump
     why: without a declared surface every helper becomes a promise
-    status: open
-    evidence: src/jigsaw/__init__.py is empty
+    status: partial
+    evidence: src/jigsaw/__init__.py (__all__ declares 10 names; the policy isn't written down)
   - id: typed-package
     area: release
     bar: The package ships py.typed and passes pyright in strict mode
