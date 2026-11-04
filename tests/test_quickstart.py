@@ -18,9 +18,12 @@ def test_quickstart_logs_one_cheap_and_one_escalated_decision(tmp_path, capsys):
     assert load_quickstart().main(db) == 0
 
     out = capsys.readouterr().out
-    assert "turn 1 build: farm at rung 2" in out
-    assert "turn 2 recruit: archers at rung 7 (close call" in out
-    assert "logged 2 decisions" in out
+    assert "Final: farm, decided at rung 2" in out
+    assert "The cheap scorer (rung 2) picks spearmen" in out
+    assert "0.04 apart" in out
+    assert "Final: archers, decided at rung 7" in out
+    assert "#2 turn 2 recruit: archers at rung 7 (close call" in out
+    assert "1 of 2 decisions needed a model" in out
 
     with DecisionLog(db) as log:
         assert log.rung_counts("demo") == {2: 1, 7: 1}
