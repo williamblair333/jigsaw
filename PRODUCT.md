@@ -11,7 +11,7 @@ every decision recorded so the expensive calls can be counted and turned into ru
 - **Bill, through Parley** (the MTW2 game pack): the first and, for now, only real user. Parley
   pins a Jigsaw tag and supplies the adapter, the deciders and the model calls.
 - **Later, game-AI hobbyists and modders** writing a pack for another turn-based game. They know
-  Python, have Python 3.11+ with pip or uv, and know their game. They don't know Jigsaw's
+  Python, have uv (which fetches Python 3.11+ if needed), and know their game. They don't know Jigsaw's
   ladder or gate, and may have no API key at hand.
 
 The engine assumes no game, no model provider and no network. A pack brings those.
@@ -31,8 +31,8 @@ The engine assumes no game, no model provider and no network. A pack brings thos
 ## First-run path
 
 1. `git clone https://github.com/williamblair333/jigsaw && cd jigsaw`
-2. `pip install .`
-3. `python examples/quickstart.py`
+2. `uv sync`
+3. `uv run examples/quickstart.py`
 
 It prints a clear-win decision kept at rung 2, a close call escalated to rung 7 (a stub stands in
 for the model, so no key is needed), and the per-rung counts read back from the SQLite log.
@@ -59,11 +59,11 @@ for the model, so no key is needed), and the per-rung counts read back from the 
 
 ```yaml
 verify:
-  image: python:3.12-slim
+  image: ghcr.io/astral-sh/uv:python3.12-bookworm-slim
   network: required
   install:
-    - pip install .
-  run: python examples/quickstart.py /tmp/jigsaw/decisions.db
+    - uv sync
+  run: uv run examples/quickstart.py /tmp/jigsaw/decisions.db
   expect:
     - stdout_contains: "farm at rung 2"
     - stdout_contains: "archers at rung 7 (close call"

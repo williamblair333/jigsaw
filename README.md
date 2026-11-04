@@ -11,12 +11,12 @@ Status: alpha (0.1.0). The decision log, the gate and the ladder work and are us
 templates and distillation are still design. See `docs/specs/2026-10-26-jigsaw-design.md`. The first game pack is
 Medieval II: Total War, through the Parley project.
 
-Try it in under two minutes, offline, with no API key:
+Try it in under two minutes, offline, with no API key (needs [uv](https://docs.astral.sh/uv/)):
 
 ```bash
 git clone https://github.com/williamblair333/jigsaw && cd jigsaw
-pip install .
-python examples/quickstart.py
+uv sync
+uv run examples/quickstart.py
 ```
 
 One clear-win decision stays at rung 2, a close call escalates to rung 7 (a stub plays the

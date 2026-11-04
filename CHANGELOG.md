@@ -12,7 +12,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `log-both-verdicts` (the cheap verdict is dropped when a decision escalates).
 - `examples/quickstart.py`: offline, keyless demo (one rung-2 decision, one close call escalated
   to a stub rung 7, both read back from the log), covered by `tests/test_quickstart.py`.
-- README: a three-command first run.
+- README: a three-command first run, with uv (`uv sync`, `uv run examples/quickstart.py`), not pip.
 
 ## [0.1.0] - 2026-11-04
 
