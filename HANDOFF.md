@@ -2,8 +2,11 @@
 
 ## 2026-11-04: product brief and expert bar
 
-**State:** `PRODUCT.md` and `STANDARDS.md` written on branch `docs/product-standards`, plus
-`examples/quickstart.py` and its test (36 tests pass). The first-run gate passes
+**State:** `PRODUCT.md`, `STANDARDS.md`, the explaining quickstart and the plain-language README
+are merged (#11–#13); the Gitea → GitHub push mirror is live (set up by the mtw2 session), so
+don't push to GitHub by hand. An alternatives scan of LLM routers is in the spec's prior-art
+section (PR open, `docs/prior-art-routers`); verdict: stay game-focused, routers only inside
+packs. 36 tests pass. The first-run gate passes
 (`python3 /opt/proj/Uncle-J-s-Refinery/features/product-quality/first_run_gate.py .`);
 `standards_check.py --check .` is clean. The gate writes `.first-run-gate/` locally (ignored).
 A Gemini referee caught one wrong status (`public-api-declared`: `__all__` already exists), now fixed.

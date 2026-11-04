@@ -23,6 +23,65 @@ it's best at; templates per genre; MTW2 is the only game pack for now; private n
   cheap-to-expensive model cascade, and distillation of LLM decisions into rules. Nothing for
   Total War at all. That gap is Jigsaw.
 
+### Outside games: LLM routers and cascades (searched 2026-11-04)
+
+Question: should Jigsaw stay game-only, generalize its core, or adopt a router for the model
+rungs? The full scan with every quote is in `_review/2026-11-04-alternatives-llm-routers.md`
+(local). READMEs were read directly, and each quoted claim was checked against its file.
+
+| Tool | Non-model rungs? | Escalates on | Logs reason + outcome? | Learns / distills? | Open, maintained, library? |
+|---|---|---|---|---|---|
+| RouteLLM [1] | no, two models | query difficulty | no | trained offline on preference data [2] | Apache-2.0 library; last push 2024-08 |
+| FrugalGPT [3] | no | a scorer judges each answer | no | learns model combinations; caches, fine-tunes | research code; last push 2025-02 |
+| LiteLLM Router [4] | no | load, latency, cost, errors; prompt-complexity tiers | cost and deployment, no reason, no outcome | no | library + proxy; active |
+| Martian [5] | — | — | — | — | router no longer offered; site lists research products |
+| Not Diamond [6] | no | prompt → predicted best model | not stated | custom routers from uploaded evals | hosted API; Python SDK archived |
+| OpenRouter Auto [7] | no | task type × community spend, cost tier | chosen model and task type, no reason | follows market spend, not your feedback | hosted only |
+| NadirClaw [8] | no | classifier, then a verifier (τ=0.80) | local SQLite/JSONL | retraining in paid tier only | PolyForm Noncommercial (not open source) |
+| LLMRouter [9] | no | complexity, cost, performance | not stated | online learning is a TODO | MIT library; active |
+| NVIDIA llm-router [10] | no | predicted quality, latency, cost | dev-only stdout logs | from historical data | Apache-2.0 service; active |
+| vLLM Semantic Router [11] | no | quality/latency/cost policy | not stated | not stated | Apache-2.0 server; active |
+
+Research closest to the loop: Inter-Cascade [12] distills the strong model's answers into
+reusable strategies retrieved into the weak model's prompt (not rules); Fanconi et al. [13]
+cascade base model → large model → human, with online learning from human feedback.
+
+**What it shows.** Every tool routes between models only. All judge the query or the answer;
+none looks at the margin between a decision's own options, a stakes flag or a human in the loop.
+None records an escalation reason together with a later outcome, and none distills model answers
+into rules. The field is also unstable: RouteLLM is unmaintained, Not Diamond's SDK is archived,
+Martian dropped its router, and OpenRouter swapped Not Diamond for its own rankings.
+
+**Verdict (2026-11-04): stay game-focused for now; use a router inside packs, not the engine;
+generalize only on a trigger.**
+
+- *Generalize (rename `turn` to a step, add a time cadence): not yet.* The niche is open, but
+  what would make Jigsaw worth generalizing is the learning half, and STANDARDS.md's top gaps are
+  that half: `log-both-verdicts`, `full-request-replayable`, `gate-concordance-report`. The engine
+  has no game logic, only game words on `Request`, so a rename stays cheap later. Done now, it
+  breaks Parley's pinned API for no current user, with no deprecation policy yet
+  (`release-practice`).
+- *Adopt a router: in packs only.* PRODUCT.md's non-goal stands: the engine calls no model
+  provider. Routers handle a different layer (which model and provider, retries, fallbacks,
+  cost), and that layer lives in a pack's rung 5–7 decider. LiteLLM is the one candidate that
+  is maintained, a library, and covers fallbacks and retries, which `decider-failure-contained`
+  needs from a pack.
+- *Take two ideas:* an answer-confidence escalation reason (FrugalGPT's scorer, NadirClaw's
+  verifier), and a strategy store (Inter-Cascade) as a step before full rule distillation.
+- *Revisit when:* a non-game user wants the engine (then add `step` beside `turn` and a time
+  cadence, and deprecate the old names for one minor release); the concordance report shows
+  real savings; or a router ships non-model tiers or outcome-based learning.
+
+Sources: [1] github.com/lm-sys/RouteLLM; [2] Ong et al., arXiv 2406.18665;
+[3] Chen, Zaharia, Zou, arXiv 2305.05176, github.com/stanford-futuredata/FrugalGPT;
+[4] docs.litellm.ai/docs/routing and github.com/BerriAI/litellm; [5] withmartian.com, fetched
+2026-11-04; [6] github.com/Not-Diamond/notdiamond-python (archived) and
+docs.notdiamond.ai/docs/router-training-quickstart;
+[7] openrouter.ai/docs/guides/routing/routers/auto-router; [8] github.com/NadirRouter/NadirClaw;
+[9] github.com/ulab-uiuc/LLMRouter; [10] github.com/NVIDIA-AI-Blueprints/llm-router;
+[11] github.com/vllm-project/semantic-router; [12] Wu et al., arXiv 2509.22984;
+[13] Fanconi et al., arXiv 2506.11887. Repo activity and archive status: GitHub API, 2026-11-04.
+
 ## Pieces
 
 ```
