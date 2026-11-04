@@ -14,6 +14,13 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   to a stub rung 7, both read back from the log), covered by `tests/test_quickstart.py`.
 - README: a three-command first run, with uv (`uv sync`, `uv run examples/quickstart.py`), not pip.
 
+### Changed
+- README rewritten in plain language: why Jigsaw exists, the ladder, gate and log explained with
+  the real defaults, the quickstart's actual output, a usage example that runs, and status/gaps.
+- `examples/quickstart.py` now explains each decision as it happens: what the cheap scorer picked,
+  why the gate did or didn't escalate (the score gap against the margin), and the log read back.
+  With no path argument it writes a fresh temporary log each run.
+
 ## [0.1.0] - 2026-11-04
 
 First public release (alpha). The API may change before 1.0.

@@ -65,9 +65,9 @@ verify:
     - uv sync
   run: uv run examples/quickstart.py /tmp/jigsaw/decisions.db
   expect:
-    - stdout_contains: "farm at rung 2"
-    - stdout_contains: "archers at rung 7 (close call"
-    - stdout_contains: "logged 2 decisions"
+    - stdout_contains: "Final: farm, decided at rung 2"
+    - stdout_contains: "#2 turn 2 recruit: archers at rung 7 (close call"
+    - stdout_contains: "1 of 2 decisions needed a model"
     - file: /tmp/jigsaw/decisions.db
     - exit_code: 0
   time_target_seconds: 120
