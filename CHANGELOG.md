@@ -5,6 +5,15 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+- `PRODUCT.md`: core job, users, success measures, first-run path, non-goals, UI principles and
+  a `verify:` block. The first-run gate passes in a clean `python:3.12-slim` container.
+- `STANDARDS.md`: the expert bar, 19 items ranked by impact, plus 3 ideas to test. Top gap:
+  `log-both-verdicts` (the cheap verdict is dropped when a decision escalates).
+- `examples/quickstart.py`: offline, keyless demo (one rung-2 decision, one close call escalated
+  to a stub rung 7, both read back from the log), covered by `tests/test_quickstart.py`.
+- README: a three-command first run.
+
 ## [0.1.0] - 2026-11-04
 
 First public release (alpha). The API may change before 1.0.

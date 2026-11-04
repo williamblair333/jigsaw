@@ -11,7 +11,18 @@ Status: alpha (0.1.0). The decision log, the gate and the ladder work and are us
 templates and distillation are still design. See `docs/specs/2026-10-26-jigsaw-design.md`. The first game pack is
 Medieval II: Total War, through the Parley project.
 
-Install it from git (it isn't on PyPI yet):
+Try it in under two minutes, offline, with no API key:
+
+```bash
+git clone https://github.com/williamblair333/jigsaw && cd jigsaw
+pip install .
+python examples/quickstart.py
+```
+
+One clear-win decision stays at rung 2, a close call escalates to rung 7 (a stub plays the
+model), and both are read back from the SQLite log.
+
+Add it to your project from git (it isn't on PyPI yet):
 
 ```bash
 uv add "jigsaw @ git+https://github.com/williamblair333/jigsaw@v0.1.0"
