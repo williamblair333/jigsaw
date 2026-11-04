@@ -2,7 +2,7 @@
 
 A rung-2 utility scorer answers both. The first is a clear win and stays at rung 2. The second
 is a close call, so the gate escalates it to rung 7, played here by a stub instead of a real
-model. Run: python examples/quickstart.py [LOG_PATH]
+model. Run: uv run examples/quickstart.py [LOG_PATH]
 """
 
 from __future__ import annotations
