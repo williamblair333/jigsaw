@@ -14,6 +14,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   to a stub rung 7, both read back from the log), covered by `tests/test_quickstart.py`.
 - README: a three-command first run, with uv (`uv sync`, `uv run examples/quickstart.py`), not pip.
 
+- Design spec, prior art: an outside-games scan of LLM routers and cascades (RouteLLM,
+  FrugalGPT, LiteLLM, Martian, Not Diamond, OpenRouter Auto, NadirClaw, LLMRouter, NVIDIA,
+  vLLM Semantic Router) and a verdict: stay game-focused, routers inside packs only, generalize
+  on a stated trigger. Full write-up: `docs/research/2026-11-04-llm-routers-and-cascades.md`.
+
 ### Changed
 - README rewritten in plain language: why Jigsaw exists, the ladder, gate and log explained with
   the real defaults, the quickstart's actual output, a usage example that runs, and status/gaps.
