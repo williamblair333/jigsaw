@@ -7,8 +7,17 @@ is close, risky or new enough to escalate, and then a cascade of models (local, 
 strong) takes it. Every decision is logged, so repeated LLM calls can become rules over time.
 One engine; each game plugs in as a pack, on top of a genre template.
 
-Status: design draft. See `docs/specs/2026-10-26-jigsaw-design.md`. The first game pack is
+Status: alpha (0.1.0). The decision log, the gate and the ladder work and are used by Parley;
+templates and distillation are still design. See `docs/specs/2026-10-26-jigsaw-design.md`. The first game pack is
 Medieval II: Total War, through the Parley project.
+
+Install it from git (it isn't on PyPI yet):
+
+```bash
+uv add "jigsaw @ git+https://github.com/williamblair333/jigsaw@v0.1.0"
+```
+
+Work on it:
 
 ```bash
 just setup   # install dependencies

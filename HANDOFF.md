@@ -1,5 +1,13 @@
 # Handoff
 
+## 2026-11-04: v0.1.0, public
+
+**State:** public on Gitea (`bill/jigsaw`) and GitHub (`williamblair333/jigsaw`, push mirror from
+Gitea). Tag `v0.1.0`. Parley now pins `git+https://github.com/williamblair333/jigsaw@v0.1.0`
+instead of the path, so a clean machine can install it. To ship a change to Parley: merge here,
+tag a new version, then bump the pin in Parley's pyproject.toml and run `uv lock`.
+No STANDARDS.md or PRODUCT.md yet: run the Uncle J skills pass here next.
+
 ## 2026-10-26: decision log, ladder and gate built; MTW2 uses them
 
 **State:** main after the decision-id PR. `just test` (35 pass). `Verdict.decision_id` lets
