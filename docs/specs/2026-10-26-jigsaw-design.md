@@ -26,8 +26,9 @@ it's best at; templates per genre; MTW2 is the only game pack for now; private n
 ### Outside games: LLM routers and cascades (searched 2026-11-04)
 
 Question: should Jigsaw stay game-only, generalize its core, or adopt a router for the model
-rungs? The full scan with every quote is in `_review/2026-11-04-alternatives-llm-routers.md`
-(local). READMEs were read directly, and each quoted claim was checked against its file.
+rungs? The full scan, with sources and the reasoning, is in
+`docs/research/2026-11-04-llm-routers-and-cascades.md`. READMEs were read directly, and each
+quoted claim was checked against its file.
 
 | Tool | Non-model rungs? | Escalates on | Logs reason + outcome? | Learns / distills? | Open, maintained, library? |
 |---|---|---|---|---|---|

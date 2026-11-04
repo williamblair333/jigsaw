@@ -17,7 +17,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Design spec, prior art: an outside-games scan of LLM routers and cascades (RouteLLM,
   FrugalGPT, LiteLLM, Martian, Not Diamond, OpenRouter Auto, NadirClaw, LLMRouter, NVIDIA,
   vLLM Semantic Router) and a verdict: stay game-focused, routers inside packs only, generalize
-  on a stated trigger.
+  on a stated trigger. Full write-up: `docs/research/2026-11-04-llm-routers-and-cascades.md`.
 
 ### Changed
 - README rewritten in plain language: why Jigsaw exists, the ladder, gate and log explained with
