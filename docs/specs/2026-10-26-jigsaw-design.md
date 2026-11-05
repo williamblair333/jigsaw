@@ -109,7 +109,7 @@ point (threat, front lines, supply, settlement value). Every rung reads it.
 
 Two additions from review:
 - **Resource reservation**: deciders reserve resources (gold, recruitment slots, movement) before
-  committing actions. Later deciders see what remains, preventing overspending across the turn.
+  committing actions. Later deciders see what remains, preventing overspending across the turn. Built (2026-11-05): `jigsaw.world.Budget`, `Verdict.costs`, `Ladder(budget=...)`.
 - **Compact summaries over raw state**: high-level summaries replace raw dumps for LLM rungs.
   Raw state grows uncontrollably (Vox Deorum prompts hit 100k tokens late game, degrading reasoning).
 

@@ -6,6 +6,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- Decisions in a turn often share gold or recruitment slots (spec §2, resource reservation).
+  `Budget` holds turn totals; call `reset(...)` each turn. A decider sets `Verdict(costs=...)`.
+  `Ladder(budget=...)` refuses answers over budget so they pass up like illegal ones, and charges
+  only the answer that stands. `reserve` is all-or-nothing and thread-safe, so two seats cannot
+  both spend the last gold. Call `budget.release(costs)` when the game rejects a charged order.
 - `jigsaw.utility` adds rung-2 utility scoring (Mark, *Behavioral Mathematics for Game AI*).
   `UtilityDecider` scores each option on `Consideration` inputs shaped by four response curves
   (`linear`, `power`, `logistic`, `step`) and combined with `compensate`. `Verdict.options`
