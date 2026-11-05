@@ -5,6 +5,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-11-05
+
+No breaking changes, and the log stays at schema 4. New: rung-2 utility scoring
+(`jigsaw.utility`) and a budget for the turn (`jigsaw.world.Budget`). `just contract` passed
+before the tag: 1612 Parley tests.
+
 ### Added
 - Decisions in a turn often share gold or recruitment slots (spec §2, resource reservation).
   `Budget` holds turn totals; call `reset(...)` each turn. A decider sets `Verdict(costs=...)`.
