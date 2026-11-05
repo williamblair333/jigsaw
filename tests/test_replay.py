@@ -83,6 +83,8 @@ def test_schema_3_adds_request_column_to_a_v2_file(tmp_path: Path) -> None:
     with sqlite3.connect(path) as conn:   # make it look like a v0.2.0 file
         conn.execute("ALTER TABLE decisions DROP COLUMN request")
         conn.execute("ALTER TABLE decisions DROP COLUMN intent")   # added in schema 4
+        for col in ("shadow_choice", "shadow_rung", "holding"):     # added in schema 5
+            conn.execute(f"ALTER TABLE decisions DROP COLUMN {col}")
         conn.execute("PRAGMA user_version = 2")
         conn.execute(
             "INSERT INTO decisions (game, turn, actor, kind, situation, options, rung, "

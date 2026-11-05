@@ -15,8 +15,9 @@ _log = logging.getLogger("jigsaw")
 # 1: v0.1.0's table. Those files never set user_version, so they read as 0.
 # 2: adds cheap_choice, cheap_rung and decider_errors (v0.2.0).
 # 3: adds request, the whole Request as JSON, so rows can be replayed (v0.3.0).
-# 4: adds intent, a model rung's goal, so outcomes can be traced to it.
-SCHEMA_VERSION = 4
+# 4: adds intent, a model rung's goal, so outcomes can be traced to it (v0.5.0).
+# 5: adds shadow_choice, shadow_rung (shadow audits) and holding (for distillation).
+SCHEMA_VERSION = 5
 
 _CREATE_TABLE = """
 CREATE TABLE IF NOT EXISTS decisions (
@@ -39,7 +40,10 @@ CREATE TABLE IF NOT EXISTS decisions (
     cheap_rung INTEGER,
     decider_errors TEXT NOT NULL DEFAULT '[]',
     request TEXT,
-    intent TEXT
+    intent TEXT,
+    shadow_choice TEXT,
+    shadow_rung INTEGER,
+    holding TEXT
 )
 """
 
@@ -52,6 +56,11 @@ _MIGRATIONS: dict[int, list[str]] = {
     ],
     3: ["ALTER TABLE decisions ADD COLUMN request TEXT"],
     4: ["ALTER TABLE decisions ADD COLUMN intent TEXT"],
+    5: [
+        "ALTER TABLE decisions ADD COLUMN shadow_choice TEXT",
+        "ALTER TABLE decisions ADD COLUMN shadow_rung INTEGER",
+        "ALTER TABLE decisions ADD COLUMN holding TEXT",
+    ],
 }
 
 
@@ -100,6 +109,11 @@ class Decision(BaseModel):
     request: dict[str, Any] | None = None
     # The model rung's intent (id, verb, args) when the final verdict carried one; else None.
     intent: dict[str, Any] | None = None
+    # A shadow audit: what a higher rung said about this quiet decision, logged, not acted on.
+    shadow_choice: str | None = None
+    shadow_rung: int | None = Field(default=None, ge=0, le=7)
+    # A model rung's holding, {"when": {...}, "choose": ...}, for distillation into rules.
+    holding: dict[str, Any] | None = None
 
 
 class DecisionLog:
@@ -205,6 +219,9 @@ class DecisionLog:
             decider_errors=json.loads(row["decider_errors"]),
             request=json.loads(row["request"]) if row["request"] is not None else None,
             intent=json.loads(row["intent"]) if row["intent"] is not None else None,
+            shadow_choice=row["shadow_choice"],
+            shadow_rung=row["shadow_rung"],
+            holding=json.loads(row["holding"]) if row["holding"] is not None else None,
         )
 
     def record(self, d: Decision) -> int:
@@ -220,8 +237,8 @@ class DecisionLog:
                     game, turn, actor, kind, situation, options, rung,
                     escalated_because, choice, primitives, legality,
                     outcome, outcome_turn, created_at, cheap_choice, cheap_rung,
-                    decider_errors, request, intent
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    decider_errors, request, intent, shadow_choice, shadow_rung, holding
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     d.game,
@@ -243,6 +260,9 @@ class DecisionLog:
                     json.dumps(d.decider_errors),
                     json.dumps(d.request, default=repr) if d.request is not None else None,
                     json.dumps(d.intent, default=repr) if d.intent is not None else None,
+                    d.shadow_choice,
+                    d.shadow_rung,
+                    json.dumps(d.holding, default=repr) if d.holding is not None else None,
                 ),
             )
             new_id = cursor.lastrowid

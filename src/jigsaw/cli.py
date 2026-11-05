@@ -9,6 +9,7 @@ import sys
 from typing import Any
 
 from jigsaw.decision_log import DecisionLog
+from jigsaw.distill import evaluate_holdings, holdings_table
 from jigsaw.ladder import Gate, GateConfig, Ladder
 from jigsaw.replay import replay_gate, replay_ladder
 from jigsaw.skip_lot import SkipLotGate
@@ -104,7 +105,21 @@ def main(argv: list[str] | None = None) -> int:
     )
     cp.add_argument("log", help="path to a decision log (.db)")
     cp.add_argument("--game")
+    hp = commands.add_parser(
+        "holdings",
+        help="each logged holding: how many logged decisions it matches and how often it agrees",
+    )
+    hp.add_argument("log", help="path to a decision log (.db)")
+    hp.add_argument("--game")
     args = parser.parse_args(argv)
+
+    if args.command == "holdings":
+        log = _open(args.log)
+        if log is None:
+            return 2
+        with log:
+            print(holdings_table(evaluate_holdings(log, game=args.game)))
+        return 0
 
     if args.command == "concordance":
         log = _open(args.log)

@@ -105,6 +105,24 @@ a logged campaign with `uv run jigsaw replay LOG --gate cadence=0 --skip-lot str
 decisions where skipping would have lost the model's different answer. The replay feeds the gate
 the logged outcome only when it escalated itself, as a live game would.
 
+The shadow audit is another STANDARDS idea (`shadow-audit-sample`). `Ladder(shadow_rate=0.03)`
+also asks the higher rungs on that share of quiet decisions. The ladder logs the answer in
+`shadow_choice` and `shadow_rung` and never acts on it. Each one is a real model call, and the
+shadow answer skips the legality check, so it may name a move the game wouldn't allow.
+`jigsaw concordance` then adds `shadowed` and `shadow_agreement` columns, so you can compare
+how often the model agrees on decisions the gate let through with how often it agrees on ones
+it escalated.
+
+Holdings are another STANDARDS idea (`holdings-for-distillation`). A model verdict can carry
+`holding={"when": {"treasury": {"max": 500}}, "choose": "spears"}`. A condition is a plain
+value (equal), a list (one of), or `{"min": a, "max": b}` on a `request.context` key, and a
+malformed holding (no conditions, an unknown range key, a bound that isn't a number) is refused
+when it's built. Only model rungs record holdings, and the ladder drops one that doesn't choose
+the verdict's own answer. `uv run jigsaw holdings LOG` shows each logged holding, how many other
+logged decisions of its game and kind it matches, and how often the logged answer agreed. Its
+own source row doesn't count, since it agrees by construction. `HoldingsDecider(holdings(log))` plays them back as a rung-1 rule. Run it
+with `shadow_rate` before trusting it.
+
 ## Try it
 
 You need [uv](https://docs.astral.sh/uv/). This runs offline and needs no API key:
