@@ -20,8 +20,8 @@ standards:
     area: learning loop
     bar: When a decision escalates, its log row holds the cheap rung's choice and rung next to the final one, so agreement is computable from the log alone
     why: a routing engineer can't learn when to stop asking the strong model if the log drops the answer it was checking
-    status: open
-    evidence: Ladder.decide discards cheap_verdict once the gate escalates; Decision has no field for it
+    status: done
+    evidence: tests/test_both_verdicts.py
   - id: decider-failure-contained
     area: game AI
     bar: A decider that raises or exceeds its time budget is treated as passing up, and the reason is logged; a test proves a raising rung-7 decider still yields a verdict
@@ -38,14 +38,14 @@ standards:
     area: data
     bar: The log records its schema version in PRAGMA user_version and migrates older files forward on open; a test opens a v1 file with current code
     why: campaign logs outlive releases, and Parley moves its pin forward
-    status: open
-    evidence: _init_db uses CREATE TABLE IF NOT EXISTS only; a new column would silently be missing from old files
+    status: done
+    evidence: tests/test_both_verdicts.py
   - id: gate-concordance-report
     area: learning loop
     bar: One command reports, per game and decision kind, how often the escalated rung agreed with the cheap one
     why: the spec's 95%-agreement rule needs a number per kind; RouteLLM's savings range from 35% to 85% by task type
     status: open
-    evidence: needs log-both-verdicts first
+    evidence: the data is now logged (log-both-verdicts); no command reads it yet
   - id: log-write-failure-contained
     area: data
     bar: A failed log write never discards the verdict; it is counted and surfaced to the caller, and a test simulates a failing write

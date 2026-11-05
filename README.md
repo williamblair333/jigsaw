@@ -47,10 +47,15 @@ The margin (0.10), the stakes threshold (0.7), the cadence (10) and the rung whe
 (5) are settings in `GateConfig`. A human player or an unanswered decision always escalates.
 
 **The log** writes each decision to a SQLite file: the options, the choice, the rung that made
-it, and why it climbed. Later you can record how it turned out. This is the part meant to pay
-off over time. The goal is to learn, per kind of decision, how often the model agrees with the
-cheap scorer, and to stop asking where it nearly always does. The log can't measure that yet:
-see Status.
+it, and why it climbed. When a decision climbs, the row also keeps what the cheap rung picked
+(`cheap_choice`, `cheap_rung`). Later you can record how it turned out. This is the part meant
+to pay off over time. The goal is to learn, per kind of decision, how often the model agrees
+with the cheap scorer, and to stop asking where it nearly always does. The log now holds the
+data for that; a command that reports it is not built yet.
+
+The log file carries a version number. When a newer Jigsaw opens a log made by an older one, it
+adds the missing columns and keeps every row. v0.1.0 can still read and write a newer file,
+since the new columns may be empty. From v0.2.0 on, Jigsaw refuses a file newer than itself.
 
 ## Try it
 
@@ -128,8 +133,8 @@ Alpha, version 0.1.0. The API may change before 1.0.
   War*, uses them.
 - **Designed, not built:** a gate that learns from the log, genre templates, and *distillation*
   (turning repeated model answers into rules). See `docs/specs/2026-10-26-jigsaw-design.md`.
-- **Known gaps:** listed and ranked in `STANDARDS.md`. The first one: when a decision escalates,
-  the log keeps only the model's answer, not what the cheap scorer would have picked.
+- **Known gaps:** listed and ranked in `STANDARDS.md`. The first one: a decider that crashes
+  or hangs takes the whole decision down with it, instead of counting as a pass.
 - **Out of scope:** real-time games, and calling model providers. Your deciders do that.
 
 ## Work on it
