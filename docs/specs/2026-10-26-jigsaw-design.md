@@ -220,7 +220,7 @@ via intent contract (§5).
 3. **Gate plus rung-1 rules**: placed in front of Parley's existing LLM to cut costs immediately.
 4. **Decider-plus-adapter pairs from MTW2 decision inventory**: 92 rows in `mtw2/docs/decision-inventory.md`.
    Start with click debt (event popups), then the siege clock (in progress).
-5. **Rungs 2–3 and intents**: utility scoring, planners, and intent decomposition.
+5. **Rungs 2–3 and intents**: utility scoring, planners, and intent decomposition. Built so far (2026-11-05): utility scoring (`jigsaw.utility`) and intent decomposition (`jigsaw.intent`); planners are still the pack's own.
 6. **Templates and distillation**: extract genre patterns and distill rules after a full campaign runs.
 
 ## Custom algorithms (MTW2 first)

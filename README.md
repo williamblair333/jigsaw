@@ -158,6 +158,28 @@ verdict = ladder.decide(Request(
 log.set_outcome(verdict.decision_id, "raid repelled", turn=14)
 ```
 
+### A rung-2 scorer
+
+`UtilityDecider` in `jigsaw.utility` scores each option on considerations. A consideration takes an input in 0..1 shaped by a response curve (`linear`, `power`, `logistic`, `step`). The decider multiplies the considerations together with Mark's compensation factor.
+
+```python
+from jigsaw import Consideration, UtilityDecider, linear
+
+LEVEL = {"low": 0.0, "normal": 0.5, "high": 1.0}
+
+TAX = UtilityDecider(
+    kinds={"set_tax"},
+    considerations=[
+        # more tax when the treasury needs it
+        Consideration("need", lambda r, o: 1 - abs(r.context["treasury_need"] - LEVEL[o.name]), linear()),
+        # less tax when the town is restless
+        Consideration("calm", lambda r, o: r.context["unrest"] * LEVEL[o.name], linear(-1, 1)),
+    ],
+)
+```
+
+The verdict carries each option's score, so the gate escalates when the top two scores are close, and the log keeps those scores.
+
 A decider returns `None` to pass the decision to the next rung. If no rung answers, the verdict
 has `choice=""` and `rung=0`, and its `reason` says the game's own AI keeps the decision. If the
 gate escalates but no model rung answers, you get the cheap rung's verdict, and its `reason`
