@@ -420,9 +420,11 @@ class Ladder:
             actor=req.actor,
             kind=req.kind,
             situation=req.situation,
+            # scores that match the logged choice: the final rung's, else the cheap rung's
             options=normalise(
-                cheap_verdict.options if cheap_verdict is not None and cheap_verdict.options
-                else final_verdict.options or req.options
+                final_verdict.options
+                or (cheap_verdict.options if cheap_verdict is not None else [])
+                or req.options
             ),
             rung=final_verdict.rung,
             escalated_because=gate_reason,

@@ -20,6 +20,9 @@ Curve = Callable[[float], float]
 
 
 def _clamp(x: float) -> float:
+    """Into 0..1. NaN, which compares false with everything, becomes 0."""
+    if math.isnan(x):
+        return 0.0
     return 0.0 if x < 0.0 else 1.0 if x > 1.0 else x
 
 
@@ -29,13 +32,25 @@ def linear(slope: float = 1.0, intercept: float = 0.0) -> Curve:
 
 
 def power(exponent: float) -> Curve:
-    """y = x ** exponent. Above 1 it rewards only high inputs; below 1 it rewards any input."""
+    """y = x ** exponent. Above 1 it rewards only high inputs; below 1 it rewards any input.
+
+    A negative exponent is refused: it jumps from 1 to infinity at 0. Use linear(-1, 1) for a
+    falling curve.
+    """
+    if exponent < 0:
+        raise ValueError(f"power exponent must be >= 0, got {exponent}")
     return lambda x: _clamp(_clamp(x) ** exponent)
 
 
 def logistic(k: float = 10.0, mid: float = 0.5) -> Curve:
     """An S-curve centred on mid; k sets how sharp the switch is."""
-    return lambda x: _clamp(1.0 / (1.0 + math.exp(-k * (_clamp(x) - mid))))
+
+    def curve(x: float) -> float:
+        # exp() overflows past about 709; by then the curve is 0 or 1 to machine precision
+        exponent = max(-700.0, min(700.0, -k * (_clamp(x) - mid)))
+        return _clamp(1.0 / (1.0 + math.exp(exponent)))
+
+    return curve
 
 
 def step(threshold: float) -> Curve:
@@ -86,10 +101,15 @@ class UtilityDecider:
         parts: list[str] = []
         for c in self.considerations:
             try:
-                value = c.curve(c.input(req, option))
+                raw = c.input(req, option)
+                value = c.curve(raw)
             except Exception as exc:
                 return option.model_copy(
                     update={"score": 0.0, "note": f"{c.name} raised {type(exc).__name__}: {exc}"}
+                )
+            if not math.isfinite(raw):
+                return option.model_copy(
+                    update={"score": 0.0, "note": f"{c.name} input is not a number ({raw})"}
                 )
             product *= value
             parts.append(f"{c.name}={value:.2f}")
@@ -102,9 +122,12 @@ class UtilityDecider:
         if not req.options or not self.considerations:
             return None
         scored = [self.score(req, o) for o in req.options]
+        if all(" raised " in o.note for o in scored):
+            # a systematic bug, not a decision: raise so the ladder records it as a decider error
+            raise RuntimeError(f"every option failed its considerations: {scored[0].note}")
         ranked = sorted(scored, key=lambda o: o.score or 0.0, reverse=True)
         best = ranked[0]
-        if (best.score or 0.0) < self.min_score:
+        if (best.score or 0.0) <= 0.0 or (best.score or 0.0) < self.min_score:
             return None
         reason = f"utility: {best.name} {best.score:.2f}"
         if len(ranked) > 1:

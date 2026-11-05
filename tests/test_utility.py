@@ -16,7 +16,7 @@ from jigsaw.utility import Consideration, UtilityDecider, compensate, linear, lo
 
 @pytest.mark.parametrize("curve", [linear(), linear(-1, 1), power(2), power(0.5), logistic(), step(0.5)])
 def test_curves_stay_in_0_1_even_for_inputs_outside_it(curve) -> None:
-    for x in (-1.0, 0.0, 0.25, 0.5, 0.75, 1.0, 2.0):
+    for x in (-1.0, 0.0, 0.25, 0.5, 0.75, 1.0, 2.0, float("nan"), float("inf")):
         assert 0.0 <= curve(x) <= 1.0
 
 
@@ -125,6 +125,58 @@ def test_gate_escalates_on_the_deciders_close_call() -> None:
 def test_gate_stays_quiet_on_a_clear_winner() -> None:
     v = Ladder([TAX, Model()], Gate(GateConfig(cadence=0))).decide(_tax_req(treasury=0.95, unrest=0.0))
     assert (v.rung, v.choice) == (2, "high") and v.escalated_because == ""
+
+
+def test_nan_input_scores_zero_and_cannot_win() -> None:
+    vals = {"low": 0.3, "normal": float("nan"), "high": 0.9}
+    d = UtilityDecider(considerations=[Consideration("v", lambda r, o: vals[o.name], linear())])
+    v = d.decide(_tax_req(0.5, 0.5))
+    assert v is not None and v.choice == "high"
+    normal = next(o for o in v.options if o.name == "normal")
+    assert normal.score == 0.0 and "not a number" in normal.note
+
+
+def test_every_option_failing_raises_so_the_ladder_records_it() -> None:
+    broken = UtilityDecider(considerations=[
+        Consideration("missing", lambda r, o: r.context["no_such_key"], linear()),
+    ])
+    with pytest.raises(RuntimeError, match="every option failed"):
+        broken.decide(_tax_req(0.5, 0.5))
+    v = Ladder([broken], Gate(GateConfig(cadence=0))).decide(_tax_req(0.5, 0.5))
+    assert v.rung == 0 and "every option failed" in v.decider_errors[0]["error"]
+
+
+def test_all_zero_scores_pass() -> None:
+    zero = UtilityDecider(considerations=[Consideration("z", lambda r, o: 0.0, linear())])
+    assert zero.decide(_tax_req(0.5, 0.5)) is None
+
+
+def test_power_rejects_negative_exponents() -> None:
+    with pytest.raises(ValueError, match="exponent"):
+        power(-1)
+
+
+def test_logistic_does_not_overflow() -> None:
+    c = logistic(k=5000, mid=0.5)
+    assert c(0.0) == pytest.approx(0.0) and c(1.0) == pytest.approx(1.0)
+
+
+def test_log_keeps_the_final_verdicts_scores(tmp_path) -> None:
+    from jigsaw.decision_log import DecisionLog
+
+    class Scored:
+        rung = 7
+
+        def decide(self, req: Request) -> Verdict | None:
+            return Verdict(choice="low", rung=7, reason="model",
+                           options=[Option(name="low", score=0.9), Option(name="high", score=0.1)])
+
+    log = DecisionLog(tmp_path / "d.db")
+    v = Ladder([TAX, Scored()], Gate(), log).decide(
+        _tax_req(0.9, 0.1).model_copy(update={"stakes": 0.9}))
+    row = log.get(v.decision_id)
+    assert (row.choice, row.cheap_choice) == ("low", "high")
+    assert [(o.name, o.score) for o in row.options] == [("low", 0.9), ("high", 0.1)]
 
 
 def test_logistic_midpoint_is_symmetric() -> None:
