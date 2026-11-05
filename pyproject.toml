@@ -1,6 +1,6 @@
 [project]
 name = "jigsaw"
-version = "0.5.0"
+version = "0.6.0"
 description = "Game AI that decides with algorithms first and asks an LLM only when needed"
 requires-python = ">=3.11"
 license = "GPL-3.0-or-later"
