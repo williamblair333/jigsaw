@@ -68,6 +68,11 @@ The log file carries a version number. When a newer Jigsaw opens a log made by a
 adds the missing columns and keeps every row. v0.1.0 can still read and write a newer file,
 since the new columns may be empty. From v0.2.0 on, Jigsaw refuses a file newer than itself.
 
+You can read the log while a game is writing to it: the file uses SQLite's WAL mode, so a reader
+never makes a decision wait. One thing to know when you copy a log: recent writes can sit in
+`<log>-wal` beside it until the log is closed. Copy all three files (`.db`, `-wal`, `-shm`), or
+copy after the game has closed the log.
+
 **Replay** reruns a log offline, which lets you tune the gate on a campaign you've already
 played. Each row keeps the whole request, so you can ask "what if the close-call margin were
 0.02 instead of 0.1?". On the quickstart's log:

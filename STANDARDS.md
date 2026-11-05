@@ -110,8 +110,8 @@ standards:
     area: data
     bar: The log opens in WAL mode so an analysis read during a campaign never blocks a decision write
     why: the log is meant to be queried while games run
-    status: open
-    evidence: DecisionLog.__init__ sets no journal_mode
+    status: done
+    evidence: tests/test_concurrent_readers.py
   - id: public-api-declared
     area: release
     bar: jigsaw/__init__.py exports the public API with __all__, and the README states that anything outside it can change without a major bump

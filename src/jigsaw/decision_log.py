@@ -2,12 +2,14 @@
 
 from datetime import datetime, timezone
 import json
+import logging
 from pathlib import Path
 import sqlite3
 import threading
 from typing import Any
 from pydantic import BaseModel, Field
 
+_log = logging.getLogger("jigsaw")
 
 # The log file's layout version, stored in SQLite's PRAGMA user_version.
 # 1: v0.1.0's table. Those files never set user_version, so they read as 0.
@@ -110,7 +112,25 @@ class DecisionLog:
         self._lock = threading.RLock()
         self._conn = sqlite3.connect(path, check_same_thread=False, timeout=30)
         self._conn.row_factory = sqlite3.Row
+        if str(path) != ":memory:":
+            self._use_wal()
         self._init_db()
+
+    def _use_wal(self) -> None:
+        """Put the file in WAL mode, so a reader never blocks a decision write.
+
+        The mode is stored in the file, so this only does work the first time. It can fail on
+        a read-only file or a network filesystem; the log then keeps its old mode and still works.
+        """
+        try:
+            mode = self._conn.execute("PRAGMA journal_mode=WAL").fetchone()[0]
+        except sqlite3.Error as exc:
+            _log.warning("decision log %s: WAL mode not set (%s); readers may block writes",
+                         self._path, exc)
+            return
+        if str(mode).lower() != "wal":
+            _log.warning("decision log %s stays in %s mode; readers may block writes",
+                         self._path, mode)
 
     def _schema_version(self) -> int:
         version = self._conn.execute("PRAGMA user_version").fetchone()[0]

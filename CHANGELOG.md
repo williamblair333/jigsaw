@@ -14,6 +14,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `legality-before-verdict`).
 - The package exports `Legality`, `SCHEMA_VERSION`, the replay types and functions, and
   `concordance`.
+- The log uses SQLite's WAL mode, so a reader during a campaign (`jigsaw concordance`, a
+  notebook) never blocks a decision write. Existing logs switch the first time they're opened.
+  If the switch fails (a read-only file, a network filesystem), the log keeps its old mode and
+  says so in a warning (STANDARDS `concurrent-readers`).
 - `tests/test_engine_game_agnostic.py` fails if engine code (`src/jigsaw`) names a game or
   game pack. The one existing mention, a docstring, now reads "one thread per seat"
   (STANDARDS `engine-game-agnostic`).
