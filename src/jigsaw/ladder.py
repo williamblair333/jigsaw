@@ -39,6 +39,8 @@ class Verdict(BaseModel):
     decider_errors: list[dict[str, Any]] = Field(default_factory=list)
     # the gate's reason for escalating, or "" when it didn't; set by Ladder.decide
     escalated_because: str = ""
+    # why the log write failed, when it did; the verdict stands and decision_id stays None
+    log_error: str | None = None
 
 
 @runtime_checkable
@@ -146,6 +148,8 @@ class Ladder:
         self.gate = gate
         self.log = log
         self.decider_timeout = decider_timeout
+        # log writes that failed; each such verdict was still returned, with log_error set
+        self.log_failures = 0
 
     def _ask(self, decider: Decider, req: Request, errors: list[dict[str, Any]]) -> Verdict | None:
         """Ask one decider. A raise or a timeout is recorded in errors and returns None."""
@@ -235,24 +239,47 @@ class Ladder:
         final_verdict = final_verdict.model_copy(update={"escalated_because": gate_reason})
 
         if self.log is not None:
-            # On an escalation, keep the cheap answer too, so agreement can be measured later.
-            keep_cheap = bool(gate_reason) and cheap_verdict is not None
-            decision = Decision(
-                cheap_choice=cheap_verdict.choice if keep_cheap else None,
-                cheap_rung=cheap_verdict.rung if keep_cheap else None,
-                game=req.game,
-                turn=req.turn,
-                actor=req.actor,
-                kind=req.kind,
-                situation=req.situation,
-                options=normalise(req.options),
-                rung=final_verdict.rung,
-                escalated_because=gate_reason,
-                choice=final_verdict.choice,
-                primitives=final_verdict.primitives,
-                decider_errors=errors,
-                request=req.model_dump(),
-            )
-            final_verdict = final_verdict.model_copy(update={"decision_id": self.log.record(decision)})
+            try:
+                final_verdict = self._record(req, final_verdict, cheap_verdict, gate_reason, errors)
+            except Exception as exc:
+                # Losing one log row is recoverable; losing the turn is not.
+                self.log_failures += 1
+                final_verdict = final_verdict.model_copy(
+                    update={"log_error": f"{type(exc).__name__}: {exc}"}
+                )
+                _log.warning(
+                    "decision on %s/%s turn %d not logged (%d failed writes so far)",
+                    req.game, req.kind, req.turn, self.log_failures, exc_info=exc,
+                )
 
         return final_verdict
+
+    def _record(
+        self,
+        req: Request,
+        final_verdict: Verdict,
+        cheap_verdict: Verdict | None,
+        gate_reason: str,
+        errors: list[dict[str, Any]],
+    ) -> Verdict:
+        """Write the decision to the log and return the verdict with its decision_id."""
+        assert self.log is not None
+        # On an escalation, keep the cheap answer too, so agreement can be measured later.
+        keep_cheap = bool(gate_reason) and cheap_verdict is not None
+        decision = Decision(
+            cheap_choice=cheap_verdict.choice if keep_cheap and cheap_verdict else None,
+            cheap_rung=cheap_verdict.rung if keep_cheap and cheap_verdict else None,
+            game=req.game,
+            turn=req.turn,
+            actor=req.actor,
+            kind=req.kind,
+            situation=req.situation,
+            options=normalise(req.options),
+            rung=final_verdict.rung,
+            escalated_because=gate_reason,
+            choice=final_verdict.choice,
+            primitives=final_verdict.primitives,
+            decider_errors=errors,
+            request=req.model_dump(),
+        )
+        return final_verdict.model_copy(update={"decision_id": self.log.record(decision)})

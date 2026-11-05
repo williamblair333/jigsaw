@@ -5,6 +5,13 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Changed
+- A failed log write no longer loses the decision. If building or writing the row raises
+  (disk full, a locked or closed file), `Ladder.decide` still returns the verdict. Its
+  `decision_id` stays `None` and the new `verdict.log_error` says why. `Ladder.log_failures`
+  counts these, and each one is a warning on the `jigsaw` logger (STANDARDS
+  `log-write-failure-contained`).
+
 ## [0.3.0] - 2026-11-05
 
 Logs move to schema 3 the first time v0.3.0 opens them. v0.2.0 refuses a schema-3 log, so
