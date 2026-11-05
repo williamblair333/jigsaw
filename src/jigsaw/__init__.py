@@ -1,6 +1,7 @@
 """Jigsaw: Game AI that decides with algorithms first and LLMs only when needed."""
 
 from jigsaw.decision_log import SCHEMA_VERSION, Decision, DecisionLog, Option
+from jigsaw.intent import Expander, Intent
 from jigsaw.ladder import (
     Decider,
     Gate,
@@ -20,8 +21,10 @@ __all__ = [
     "Decider",
     "Decision",
     "DecisionLog",
+    "Expander",
     "Gate",
     "GateConfig",
+    "Intent",
     "Ladder",
     "Legality",
     "Option",

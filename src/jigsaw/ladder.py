@@ -1,12 +1,13 @@
 """Decision ladder and gate for Jigsaw game AI."""
 
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 import logging
 import threading
 from typing import Any, Protocol, runtime_checkable
 from pydantic import BaseModel, Field
 
 from jigsaw.decision_log import Decision, DecisionLog, Option
+from jigsaw.intent import Expander, Intent
 
 _log = logging.getLogger("jigsaw")
 
@@ -44,6 +45,8 @@ class Verdict(BaseModel):
     # the pack's legality check on each answer, in order:
     # {"rung", "choice", "legal": bool, "reason" when refused}; set by Ladder.decide
     legality: list[dict[str, Any]] = Field(default_factory=list[dict[str, Any]])
+    # a model rung's goal, expanded into primitives by the pack's expander for its verb
+    intent: Intent | None = None
 
 
 # A pack's legality check: return None when the verdict can be sent, or the reason it can't.
@@ -155,14 +158,37 @@ class Ladder:
         log: DecisionLog | None = None,
         decider_timeout: float | None = None,
         legality: Legality | None = None,
+        expanders: Mapping[str, Expander] | None = None,
     ) -> None:
         self.deciders = list(deciders)
         self.gate = gate
         self.log = log
         self.decider_timeout = decider_timeout
         self.legality = legality
+        # verb -> the pack's expander. When set, model rungs must answer with an intent.
+        self.expanders = dict(expanders) if expanders is not None else None
         # log writes that failed; each such verdict was still returned, with log_error set
         self.log_failures = 0
+
+    def _check(self, req: Request, v: Verdict) -> str | None:
+        """The legality check's refusal, or None when the verdict may be sent."""
+        if self.legality is None:
+            return None
+        try:
+            return self.legality(req, v)
+        except Exception as exc:
+            return f"legality check raised {type(exc).__name__}: {exc}"
+
+    def _refuse(
+        self, decider: Decider, req: Request, v: Verdict, reason: str,
+        checks: list[dict[str, Any]], **extra: Any,
+    ) -> None:
+        checks.append({"rung": decider.rung, "choice": v.choice, "legal": False,
+                       "reason": reason, **extra})
+        _log.warning(
+            "rung %d answer %r refused on %s/%s turn %d: %s",
+            decider.rung, v.choice, req.game, req.kind, req.turn, reason,
+        )
 
     def _ask(
         self,
@@ -171,24 +197,61 @@ class Ladder:
         errors: list[dict[str, Any]],
         checks: list[dict[str, Any]],
     ) -> Verdict | None:
-        """Ask one decider, then run the legality check on its answer. Refused means None."""
+        """Ask one decider, expand its intent if it has one, and run the legality check.
+
+        Anything refused returns None, so the ladder moves on as if the decider had passed.
+        """
         v = self._call(decider, req, errors)
-        if v is None or self.legality is None:
+        if v is None:
+            return None
+        if self.expanders is not None:
+            if decider.rung >= self.gate.config.escalate_rung and (v.intent is None or v.primitives):
+                self._refuse(decider, req, v, "model rungs answer with an intent, not primitives",
+                             checks)
+                return None
+            if v.intent is not None:
+                return self._expand(decider, req, v, v.intent, checks)
+        if self.legality is None:
             return v
-        try:
-            refusal = self.legality(req, v)
-        except Exception as exc:
-            refusal = f"legality check raised {type(exc).__name__}: {exc}"
-        entry: dict[str, Any] = {"rung": decider.rung, "choice": v.choice, "legal": refusal is None}
-        if refusal is None:
-            checks.append(entry)
-            return v
-        entry["reason"] = refusal
-        checks.append(entry)
-        _log.warning(
-            "rung %d answer %r refused by the legality check on %s/%s turn %d: %s",
-            decider.rung, v.choice, req.game, req.kind, req.turn, refusal,
-        )
+        refusal = self._check(req, v)
+        if refusal is not None:
+            self._refuse(decider, req, v, refusal, checks)
+            return None
+        checks.append({"rung": decider.rung, "choice": v.choice, "legal": True})
+        return v
+
+    def _expand(
+        self, decider: Decider, req: Request, v: Verdict, intent: Intent,
+        checks: list[dict[str, Any]],
+    ) -> Verdict | None:
+        """Plan the intent, check the plan, and replan once with the failure reason."""
+        assert self.expanders is not None
+        expander = self.expanders.get(intent.verb)
+        if expander is None:
+            self._refuse(decider, req, v, f"no expander for intent verb {intent.verb!r}", checks,
+                         intent_id=intent.id)
+            return None
+        failure: str | None = None
+        for attempt in (1, 2):
+            try:
+                primitives = expander.expand(req, intent, failure)
+            except Exception as exc:
+                failure = f"expander raised {type(exc).__name__}: {exc}"
+                continue
+            if primitives is None:
+                failure = "the expander found no plan"
+                continue
+            planned = v.model_copy(update={"primitives": primitives})
+            refusal = self._check(req, planned)
+            tag = {"intent_id": intent.id, "attempt": attempt}
+            if refusal is None:
+                checks.append({"rung": decider.rung, "choice": v.choice, "legal": True, **tag})
+                return planned
+            checks.append({"rung": decider.rung, "choice": v.choice, "legal": False,
+                           "reason": refusal, **tag})
+            failure = refusal
+        self._refuse(decider, req, v, f"intent {intent.verb} failed after replanning: {failure}",
+                     checks, intent_id=intent.id)
         return None
 
     def _call(self, decider: Decider, req: Request, errors: list[dict[str, Any]]) -> Verdict | None:
@@ -332,5 +395,6 @@ class Ladder:
             legality=final_verdict.legality,
             decider_errors=errors,
             request=req.model_dump(),
+            intent=final_verdict.intent.model_dump() if final_verdict.intent else None,
         )
         return final_verdict.model_copy(update={"decision_id": self.log.record(decision)})
