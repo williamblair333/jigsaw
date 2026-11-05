@@ -5,6 +5,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-11-05
+
+No breaking changes, and the log stays at schema 4. Every intent type in spec §5 is now built.
+`just contract` passed before the tag: 1612 Parley tests.
+
 ### Added
 - A model can steer cheap rungs by setting flavor weights in 0..1, like `{"aggression": 0.8}`,
   with `Intent(verb="persona", args={"weights": {...}})`. `PersonaExpander(blackboard, allowed=)`
