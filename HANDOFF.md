@@ -1,5 +1,38 @@
 # Handoff
 
+## 2026-11-05: the learning-loop gaps, v0.2.0, replay and concordance
+
+**State:** four STANDARDS gaps closed and merged.
+- `log-both-verdicts` and `schema-versioned` (#15).
+- `decider-failure-contained` (#16).
+- `full-request-replayable` (#18).
+- `gate-concordance-report` is on branch `feat/gate-concordance-report` and goes to PR after
+  its review.
+
+The log is at schema version 3. Each version upgrade runs in one transaction when a log is
+opened (`_MIGRATIONS` in `decision_log.py`). A log that is already current opens without a
+write lock. v0.1.0 has no version check, so it can still use a newer file (checked against
+a v2 file). v0.2.0 refuses any file newer than schema 2. So once Parley opens its logs with
+v0.3.0, moving its pin back to v0.2.0 makes those logs unreadable until it moves forward again.
+
+New command line: `jigsaw replay LOG --gate k=v,...` (no model calls) or `--ladder mod:factory`,
+and `jigsaw concordance LOG`.
+
+**Released:** v0.2.0 (#17; tag on Gitea and the GitHub mirror). It holds #15 and #16.
+Replay and concordance are unreleased and go out as v0.3.0.
+
+**Parley:** PR bill/mtw2#363 moves its pin to v0.2.0, and 1587 Parley tests pass with it.
+Nobody has merged it yet; the Parley side decides when, since a campaign may be mid-turn.
+After v0.3.0, bump the pin again.
+
+**Reviews:** Gemini (`ask_agy`, review task) timed out at 300 s with no output on both review
+attempts. Claude code-reviewer subagents did the reviews instead and found real bugs in
+replay, all fixed with tests.
+
+**Next:** tag v0.3.0. Then work the next open gaps in STANDARDS.md, in order:
+`log-write-failure-contained` (a failed log write must not lose the verdict), `ci-on-every-pr`,
+`consumer-contract-test`.
+
 ## 2026-11-04: product brief and expert bar
 
 **State:** `PRODUCT.md`, `STANDARDS.md`, the explaining quickstart and the plain-language README

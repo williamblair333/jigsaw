@@ -80,6 +80,11 @@ def main(argv: list[str] | None = None) -> int:
     cp = commands.add_parser(
         "concordance",
         help="per game and kind: how often the escalated rung agreed with the cheap one",
+        description=(
+            "Per game and kind of decision: how many escalated, how many a model rung answered "
+            "after a cheap rung had (compared), and how often the two agreed. Reads only, but "
+            "opening a log from an older Jigsaw upgrades its layout, as any Jigsaw does."
+        ),
     )
     cp.add_argument("log", help="path to a decision log (.db)")
     cp.add_argument("--game")
