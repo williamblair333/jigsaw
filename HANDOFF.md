@@ -1,11 +1,11 @@
 # Handoff
 
-## 2026-11-05: every STANDARDS item done; v0.5.0; Parley on v0.5.0
+## 2026-11-05: every STANDARDS item done; v0.7.0; Parley on v0.7.0
 
 **State:**
-- `main` is at v0.5.0, tagged on Gitea and the GitHub mirror.
-- Parley's pin moves to v0.5.0 (bill/mtw2#384, merged).
-- 106 tests pass. Pyright strict reports 0 errors.
+- `main` is at v0.7.0, tagged on Gitea and the GitHub mirror.
+- Parley's pin moves to v0.7.0 (bill/mtw2#394, merged).
+- 153 tests pass. Pyright strict reports 0 errors.
 - All 19 STANDARDS items are done. The 3 ideas are untested: `shadow-audit-sample`, `skip-lot-gate`, and `holdings-for-distillation`.
 
 **Built today:**
@@ -13,6 +13,9 @@
 - v0.3.0: the stored request, `jigsaw replay`, `jigsaw concordance`.
 - v0.4.0: the legality check, a failed log write keeps the verdict, WAL, `py.typed`, CI, the game-name test, `just contract`, the public API policy.
 - v0.5.0: the intent contract (`jigsaw.intent`, `Ladder(expanders=...)`, replan once, model rungs must answer with an intent once expanders are set), and the `first-run` CI job in a clean container.
+- v0.6.0: `Request.trace`. A rung asked after a failure sees what failed below it, and a caller can pass in failures from the game.
+- v0.7.0: rung-2 utility scoring (`jigsaw.utility`: `UtilityDecider`, considerations, response curves, Mark's compensation) with the gate judging close calls on the decider's own scores, and resource reservation (`jigsaw.world.Budget`, `Verdict.costs`, `Ladder(budget=)`).
+- Parley's logs: all 18 are schema 0, so `jigsaw concordance` compares 0 rows. Of the model ruler turns in the three biggest logs, 175 of 662 (26%) returned no orders. The findings went to the mtw2 session, which filed them in its `_review/`. It will message this repo before it starts the set_tax rung-2 rule and the quiet-turn gate.
 
 **How the repo runs:**
 - Branch protection on `main`: no direct pushes. A PR merges only with `ci / test (3.11|3.12|3.13)` and `ci / first-run` green.
@@ -26,10 +29,10 @@
 - agy's sandbox can't run the uv tool runner, so run type checks yourself.
 - Ollama and Heretic were down all day.
 
-**Next:** STANDARDS has no open items, so the next work comes from the spec's build order and Parley:
-- Parley adopts the new pieces: a `legality=` check from its validator, and expanders for its first intents.
-- Persona-weight intents and escalation with an execution trace, both spec §5, not built.
-- Test the 3 STANDARDS ideas against a real Parley campaign log, using `jigsaw concordance` and `jigsaw replay`.
+**Next:**
+- Wait for mtw2's message, then help it adopt the pieces: a `UtilityDecider` for set_tax, `Budget` for the turn's gold, `legality=` from `validate.py`, and expanders for its first intents. Engine changes stay here, and pack code stays in Parley.
+- Persona-weight intents (spec §5) need a blackboard that rungs 1–2 read; the rest of spec §2 (derived maps, compact summaries) isn't built.
+- Test the 3 STANDARDS ideas on a v0.5.0-or-later Parley campaign log with `jigsaw concordance` and `jigsaw replay`.
 
 ## 2026-11-04: product brief and expert bar
 
