@@ -19,7 +19,7 @@ class Request(BaseModel):
     actor: str
     kind: str
     situation: str
-    options: list[Option] = Field(default_factory=list)
+    options: list[Option] = Field(default_factory=list[Option])
     stakes: float = 0.0
     human: bool = False
     context: dict[str, Any] = Field(default_factory=dict)
@@ -31,19 +31,19 @@ class Verdict(BaseModel):
     choice: str
     rung: int = Field(ge=0, le=7)
     reason: str
-    primitives: list[dict[str, Any]] = Field(default_factory=list)
+    primitives: list[dict[str, Any]] = Field(default_factory=list[dict[str, Any]])
     # the decision log's row id, set by Ladder.decide when it logs; the caller records the outcome
     # against it (DecisionLog.set_outcome) once the decision has been carried out
     decision_id: int | None = None
     # deciders that raised or timed out on the way, treated as passing up; set by Ladder.decide
-    decider_errors: list[dict[str, Any]] = Field(default_factory=list)
+    decider_errors: list[dict[str, Any]] = Field(default_factory=list[dict[str, Any]])
     # the gate's reason for escalating, or "" when it didn't; set by Ladder.decide
     escalated_because: str = ""
     # why the log write failed, when it did; the verdict stands and decision_id stays None
     log_error: str | None = None
     # the pack's legality check on each answer, in order:
     # {"rung", "choice", "legal": bool, "reason" when refused}; set by Ladder.decide
-    legality: list[dict[str, Any]] = Field(default_factory=list)
+    legality: list[dict[str, Any]] = Field(default_factory=list[dict[str, Any]])
 
 
 # A pack's legality check: return None when the verdict can be sent, or the reason it can't.
