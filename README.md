@@ -163,6 +163,12 @@ connection doesn't stop the turn; the cheap answer stands. To treat a slow decid
 pass `decider_timeout=` (in seconds) to `Ladder`. Each failure is listed in
 `verdict.decider_errors` and in the log row, and logged as a warning on the `jigsaw` logger.
 
+Give the ladder your game's rules with `legality=`. This is a function `(request, verdict)` that
+returns `None` when the move is allowed, or the reason it isn't. The ladder runs it on every
+answer. A refused answer counts as passing, so a model that names a unit you don't have loses
+to the cheap rung's legal answer. If the check itself crashes, the answer is refused too: an
+unverified move is never returned.
+
 A failed log write (a full disk, a locked file) doesn't lose the decision either. The verdict
 comes back with `decision_id=None` and `log_error` set, and `ladder.log_failures` counts them.
 Watch that counter if the log matters to you: a log that fails every write still lets the game
@@ -176,8 +182,8 @@ Alpha, version 0.1.0. The API may change before 1.0.
   War*, uses them.
 - **Designed, not built:** a gate that learns from the log, genre templates, and *distillation*
   (turning repeated model answers into rules). See `docs/specs/2026-10-26-jigsaw-design.md`.
-- **Known gaps:** listed and ranked in `STANDARDS.md`. The first one: the ladder logs a
-  legality field but never runs a legality check, so an illegal verdict is still returned.
+- **Known gaps:** listed and ranked in `STANDARDS.md`. The first one: the release checklist
+  doesn't yet run the first-run check in a clean container before every tag.
 - **Out of scope:** real-time games, and calling model providers. Your deciders do that.
 
 ## Work on it

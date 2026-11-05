@@ -6,6 +6,14 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- `Ladder(legality=check)`: the pack's last gate before a move reaches the game. `check(request,
+  verdict)` returns `None` when the verdict can be sent, or the reason it can't. It runs on
+  every answer a decider gives. A refused answer counts as passing up, and so does one whose
+  check raised: an unverified move is never returned. Each result goes into `verdict.legality`,
+  into the log's `legality` column, and into the reason ("rung 7 illegal (…)") (STANDARDS
+  `legality-before-verdict`).
+- The package exports `Legality`, `SCHEMA_VERSION`, the replay types and functions, and
+  `concordance`.
 - `tests/test_engine_game_agnostic.py` fails if engine code (`src/jigsaw`) names a game or
   game pack. The one existing mention, a docstring, now reads "one thread per seat"
   (STANDARDS `engine-game-agnostic`).
