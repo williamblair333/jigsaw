@@ -26,3 +26,18 @@ jobs:
         run: uv run examples/quickstart.py
       - name: package builds
         run: uv build
+
+  # PRODUCT.md's verify block: a stranger's first run, in the clean image PRODUCT.md names.
+  # The image has no git or Node, so the source comes from Gitea's archive of this commit.
+  first-run:
+    runs-on: ubuntu-latest
+    container: ghcr.io/astral-sh/uv:python3.12-bookworm-slim
+    env:
+      SRC_URL: ${{ github.server_url }}/${{ github.repository }}/archive/${{ github.event.pull_request.head.sha || github.sha }}.tar.gz
+    steps:
+      - name: fetch this commit's source
+        run: |
+          mkdir -p /src
+          python3 -c "import os, tarfile, urllib.request as u; tarfile.open(fileobj=u.urlopen(os.environ['SRC_URL']), mode='r|gz').extractall('/src', filter='data')"
+      - name: first run, as PRODUCT.md verifies it
+        run: cd /src/* && sh scripts/first-run.sh

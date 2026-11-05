@@ -5,6 +5,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+- CI job `first-run` runs PRODUCT.md's verify block in the clean image it names, on every PR
+  and every push to `main`: `uv sync`, the quickstart, three expected output lines and the
+  log file (`scripts/first-run.sh`). It's a required check, so every tag on `main` has passed
+  it (STANDARDS `first-run-proven`).
+
 ## [0.4.0] - 2026-11-05
 
 No breaking changes, and the log stays at schema 3. Every new `Ladder` argument defaults to the

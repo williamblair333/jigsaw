@@ -86,8 +86,8 @@ standards:
     area: release
     bar: The PRODUCT.md verify block passes in a clean container before every tag
     why: a stranger's first two minutes decide whether there is a second user
-    status: partial
-    evidence: PRODUCT.md (passed locally 2026-11-04; not wired into CI or the tag step)
+    status: done
+    evidence: scripts/first-run.sh
   - id: consumer-contract-test
     area: release
     bar: Before a tag, Parley's test suite runs against the candidate Jigsaw commit
