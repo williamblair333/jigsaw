@@ -26,8 +26,8 @@ standards:
     area: game AI
     bar: A decider that raises or exceeds its time budget is treated as passing up, and the reason is logged; a test proves a raising rung-7 decider still yields a verdict
     why: the AI must never freeze or crash the campaign because one rung (usually the network one) failed
-    status: open
-    evidence: Ladder.decide calls decider.decide with no try/except and no deadline
+    status: done
+    evidence: tests/test_decider_failure.py
   - id: full-request-replayable
     area: evaluation
     bar: Each log row stores the whole Request (stakes, human, context, options), and a replay command reruns any logged rows through a candidate gate or ladder offline

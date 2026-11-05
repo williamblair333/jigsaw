@@ -125,6 +125,11 @@ has `choice=""` and `rung=0`, and its `reason` says the game's own AI keeps the 
 gate escalates but no model rung answers, you get the cheap rung's verdict, and its `reason`
 says no higher rung was available.
 
+A decider that raises an error also counts as passing. So a model rung that loses its network
+connection doesn't stop the turn; the cheap answer stands. To treat a slow decider the same way,
+pass `decider_timeout=` (in seconds) to `Ladder`. Each failure is listed in
+`verdict.decider_errors` and in the log row, and logged as a warning on the `jigsaw` logger.
+
 ## Status
 
 Alpha, version 0.1.0. The API may change before 1.0.
@@ -133,8 +138,8 @@ Alpha, version 0.1.0. The API may change before 1.0.
   War*, uses them.
 - **Designed, not built:** a gate that learns from the log, genre templates, and *distillation*
   (turning repeated model answers into rules). See `docs/specs/2026-10-26-jigsaw-design.md`.
-- **Known gaps:** listed and ranked in `STANDARDS.md`. The first one: a decider that crashes
-  or hangs takes the whole decision down with it, instead of counting as a pass.
+- **Known gaps:** listed and ranked in `STANDARDS.md`. The first one: the log doesn't keep the
+  whole request (stakes, human, context), so you can't replay old decisions through a new gate.
 - **Out of scope:** real-time games, and calling model providers. Your deciders do that.
 
 ## Work on it
