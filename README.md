@@ -176,8 +176,8 @@ Alpha, version 0.1.0. The API may change before 1.0.
   War*, uses them.
 - **Designed, not built:** a gate that learns from the log, genre templates, and *distillation*
   (turning repeated model answers into rules). See `docs/specs/2026-10-26-jigsaw-design.md`.
-- **Known gaps:** listed and ranked in `STANDARDS.md`. The first one: no CI yet, so tests run
-  only when someone runs them.
+- **Known gaps:** listed and ranked in `STANDARDS.md`. The first one: Parley's tests don't
+  run against a Jigsaw change until after it's tagged and Parley's pin moves.
 - **Out of scope:** real-time games, and calling model providers. Your deciders do that.
 
 ## Work on it
