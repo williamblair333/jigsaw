@@ -3,6 +3,7 @@
 import argparse
 import importlib
 from pathlib import Path
+import random
 import sqlite3
 import sys
 from typing import Any
@@ -10,6 +11,7 @@ from typing import Any
 from jigsaw.decision_log import DecisionLog
 from jigsaw.ladder import Gate, GateConfig, Ladder
 from jigsaw.replay import replay_gate, replay_ladder
+from jigsaw.skip_lot import SkipLotGate
 from jigsaw.report import concordance, concordance_table
 
 
@@ -25,6 +27,18 @@ def _gate_config(text: str) -> GateConfig:
             raise ValueError(f"unknown gate setting {key!r} (known: {known})")
         values[key] = value
     return GateConfig.model_validate(values)
+
+
+def _skip_lot(config: GateConfig, text: str) -> SkipLotGate:
+    """Parse "streak=20,sample=0.1". The random sample is seeded, so a replay is repeatable."""
+    values: dict[str, str] = {}
+    for pair in filter(None, (p.strip() for p in text.split(","))):
+        key, sep, value = pair.partition("=")
+        if not sep or key not in ("streak", "sample"):
+            raise ValueError(f"--skip-lot takes streak=N,sample=P, got {pair!r}")
+        values[key] = value
+    return SkipLotGate(config, streak=int(values.get("streak", 20)),
+                       sample=float(values.get("sample", 0.1)), rng=random.Random(0))
 
 
 def _ladder(spec: str) -> Ladder:
@@ -77,6 +91,8 @@ def main(argv: list[str] | None = None) -> int:
     rp.add_argument("--actor")
     rp.add_argument("--kind")
     rp.add_argument("--since-turn", type=int)
+    rp.add_argument("--skip-lot", metavar="streak=N,sample=P",
+                    help="with --gate: replay through a SkipLotGate (STANDARDS idea skip-lot-gate)")
     cp = commands.add_parser(
         "concordance",
         help="per game and kind: how often the escalated rung agreed with the cheap one",
@@ -103,6 +119,10 @@ def main(argv: list[str] | None = None) -> int:
                 "since_turn": args.since_turn}.items() if v is not None}
     try:
         gate = Gate(_gate_config(args.gate)) if args.gate is not None else None
+        if args.skip_lot is not None:
+            if gate is None:
+                raise ValueError("--skip-lot needs --gate (use --gate '' for the default settings)")
+            gate = _skip_lot(gate.config, args.skip_lot)
         ladder = _ladder(args.ladder) if args.ladder is not None else None
     except (ValueError, ImportError, AttributeError) as exc:
         print(f"jigsaw replay: {exc}", file=sys.stderr)
