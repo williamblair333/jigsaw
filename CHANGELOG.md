@@ -5,6 +5,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+- `jigsaw.utility` adds rung-2 utility scoring (Mark, *Behavioral Mathematics for Game AI*).
+  `UtilityDecider` scores each option on `Consideration` inputs shaped by four response curves
+  (`linear`, `power`, `logistic`, `step`) and combined with `compensate`. `Verdict.options`
+  carries the scored options so the gate and the log use a decider's own scores.
+
 ## [0.6.0] - 2026-11-05
 
 No breaking changes, and the log stays at schema 4. `just contract` passed before the tag: 1612
