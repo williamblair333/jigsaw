@@ -5,6 +5,15 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+- A model can steer cheap rungs by setting flavor weights in 0..1, like `{"aggression": 0.8}`,
+  with `Intent(verb="persona", args={"weights": {...}})`. `PersonaExpander(blackboard, allowed=)`
+  checks them; they reach the `Blackboard` only if the answer stands, through a new optional
+  expander step, `commit(req, intent)`, which the ladder runs after every check.
+  `Consideration(..., persona="aggression")` and `UtilityDecider(..., blackboard=...)` read them:
+  weight w raises the value to the power 2w (0 off, 0.5 neutral, 1 sharp, missing is 0.5), and a
+  value of 0 stays 0, so a veto holds (spec §5, persona-weight intents).
+
 ## [0.7.0] - 2026-11-05
 
 No breaking changes, and the log stays at schema 4. New: rung-2 utility scoring

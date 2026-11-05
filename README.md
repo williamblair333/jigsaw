@@ -184,6 +184,10 @@ The verdict carries each option's score, so the gate escalates when the top two 
 
 Many decisions in one turn often draw on the same gold or recruitment slots. `Budget({"gold": 3000, "recruit_slots": 4})` holds the turn's totals; call `reset(...)` each turn. A decider puts what its answer uses up in `Verdict(costs={"gold": 400})`. `Ladder(budget=budget)` refuses an answer the budget can't cover, so it passes up like an illegal one, and charges only the answer that stands. `reserve` is all-or-nothing and safe across threads, so two seats sharing a budget can't both spend its last gold. Call `budget.release(costs)` when the game rejects an order that was charged.
 
+### Persona weights
+
+A model can steer the cheap rungs without making every move, by setting flavor weights in 0..1, such as `{"aggression": 0.8}`, with an intent `Intent(verb="persona", args={"weights": {...}})`. `PersonaExpander(blackboard)` handles that verb: it checks each weight is a number in 0..1 (and, with `allowed=`, that its name is one you expect). The weights reach the `Blackboard` for the request's actor only if the answer stands, after your legality and budget checks. `Consideration(..., persona="aggression")` and `UtilityDecider(..., blackboard=blackboard)` read them: weight w raises that consideration's value to the power 2w, so 0.5 changes nothing, 0 switches it off, and 1 makes it count more sharply; a missing weight counts as 0.5. A value of 0 stays 0 whatever the weight, so a consideration that vetoes an option keeps vetoing it.
+
 A decider returns `None` to pass the decision to the next rung. If no rung answers, the verdict
 has `choice=""` and `rung=0`, and its `reason` says the game's own AI keeps the decision. If the
 gate escalates but no model rung answers, you get the cheap rung's verdict, and its `reason`

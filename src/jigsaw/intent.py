@@ -31,6 +31,10 @@ class Expander(Protocol):
 
     failure is None on the first try. On the replan it holds why the first plan failed
     (the legality check's reason, or what went wrong in the expander).
+
+    An expander may also define commit(req, intent). The ladder calls it once, only for the
+    answer that stands, after the legality and budget checks. Put side effects there, not in
+    expand(), which may run twice and may be refused.
     """
 
     def expand(self, req: Any, intent: Intent, failure: str | None) -> list[dict[str, Any]] | None:

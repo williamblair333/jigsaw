@@ -400,6 +400,20 @@ class Ladder:
                     choice="", rung=0, reason="no affordable answer; the game's own AI keeps it"
                 )
 
+        # An expander may have a commit(req, intent) step, run once for the answer that stands,
+        # after every check (PersonaExpander writes its weights here, not while planning).
+        if final_verdict.intent is not None and self.expanders is not None and final_verdict.choice:
+            commit = getattr(self.expanders.get(final_verdict.intent.verb), "commit", None)
+            if callable(commit):
+                try:
+                    commit(req, final_verdict.intent)
+                except Exception as exc:
+                    errors.append({"rung": final_verdict.rung,
+                                   "error": f"commit raised {type(exc).__name__}: {exc}"})
+                    _log.warning("intent %s commit failed on %s/%s turn %d",
+                                 final_verdict.intent.verb, req.game, req.kind, req.turn,
+                                 exc_info=exc)
+
         if errors:
             failed = "; ".join(f"rung {e['rung']} failed ({e['error']})" for e in errors)
             final_verdict = final_verdict.model_copy(
