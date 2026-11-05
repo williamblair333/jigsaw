@@ -50,8 +50,19 @@ The margin (0.10), the stakes threshold (0.7), the cadence (10) and the rung whe
 it, and why it climbed. When a decision climbs, the row also keeps what the cheap rung picked
 (`cheap_choice`, `cheap_rung`). Later you can record how it turned out. This is the part meant
 to pay off over time. The goal is to learn, per kind of decision, how often the model agrees
-with the cheap scorer, and to stop asking where it nearly always does. The log now holds the
-data for that; a command that reports it is not built yet.
+with the cheap scorer, and to stop asking where it nearly always does. `jigsaw concordance`
+reports that number. On the quickstart's log (`uv run examples/quickstart.py demo.db`):
+
+```
+$ uv run jigsaw concordance demo.db
+game  kind     decisions  escalated  compared  agreed  agreement
+demo  build    1          0          0         0       -
+demo  recruit  1          1          1         0       0%
+```
+
+*Compared* counts escalations where a cheap rung had answered and a model rung then decided.
+The one recruit decision went to the model, which overruled the cheap scorer, so agreement
+is 0%. Over a real campaign, a kind near 95% agreement is one the gate can stop escalating.
 
 The log file carries a version number. When a newer Jigsaw opens a log made by an older one, it
 adds the missing columns and keeps every row. v0.1.0 can still read and write a newer file,
@@ -160,8 +171,8 @@ Alpha, version 0.1.0. The API may change before 1.0.
   War*, uses them.
 - **Designed, not built:** a gate that learns from the log, genre templates, and *distillation*
   (turning repeated model answers into rules). See `docs/specs/2026-10-26-jigsaw-design.md`.
-- **Known gaps:** listed and ranked in `STANDARDS.md`. The first one: the log doesn't keep the
-  whole request (stakes, human, context), so you can't replay old decisions through a new gate.
+- **Known gaps:** listed and ranked in `STANDARDS.md`. The first one: if writing a log row
+  fails, the error escapes `Ladder.decide` and the verdict is lost with it.
 - **Out of scope:** real-time games, and calling model providers. Your deciders do that.
 
 ## Work on it

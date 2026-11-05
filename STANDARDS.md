@@ -44,8 +44,8 @@ standards:
     area: learning loop
     bar: One command reports, per game and decision kind, how often the escalated rung agreed with the cheap one
     why: the spec's 95%-agreement rule needs a number per kind; RouteLLM's savings range from 35% to 85% by task type
-    status: open
-    evidence: the data is now logged (log-both-verdicts); no command reads it yet
+    status: done
+    evidence: tests/test_report.py
   - id: log-write-failure-contained
     area: data
     bar: A failed log write never discards the verdict; it is counted and surfaced to the caller, and a test simulates a failing write

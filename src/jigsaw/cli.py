@@ -1,4 +1,4 @@
-"""The `jigsaw` command line. One command so far: replay."""
+"""The `jigsaw` command line: replay and concordance."""
 
 import argparse
 import importlib
@@ -10,6 +10,7 @@ from typing import Any
 from jigsaw.decision_log import DecisionLog
 from jigsaw.ladder import Gate, GateConfig, Ladder
 from jigsaw.replay import replay_gate, replay_ladder
+from jigsaw.report import concordance, concordance_table
 
 
 def _gate_config(text: str) -> GateConfig:
@@ -41,6 +42,18 @@ def _ladder(spec: str) -> Ladder:
     return ladder
 
 
+def _open(path: str) -> DecisionLog | None:
+    """Open an existing log, or print why not and return None. Never creates a file."""
+    if not Path(path).is_file():
+        print(f"jigsaw: no such log: {path}", file=sys.stderr)
+        return None
+    try:
+        return DecisionLog(path)
+    except (RuntimeError, sqlite3.Error) as exc:
+        print(f"jigsaw: can't open {path}: {exc}", file=sys.stderr)
+        return None
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="jigsaw")
     commands = parser.add_subparsers(dest="command", required=True)
@@ -64,7 +77,21 @@ def main(argv: list[str] | None = None) -> int:
     rp.add_argument("--actor")
     rp.add_argument("--kind")
     rp.add_argument("--since-turn", type=int)
+    cp = commands.add_parser(
+        "concordance",
+        help="per game and kind: how often the escalated rung agreed with the cheap one",
+    )
+    cp.add_argument("log", help="path to a decision log (.db)")
+    cp.add_argument("--game")
     args = parser.parse_args(argv)
+
+    if args.command == "concordance":
+        log = _open(args.log)
+        if log is None:
+            return 2
+        with log:
+            print(concordance_table(concordance(log, game=args.game)))
+        return 0
 
     filters = {k: v for k, v in
                {"game": args.game, "actor": args.actor, "kind": args.kind,
@@ -76,13 +103,8 @@ def main(argv: list[str] | None = None) -> int:
         print(f"jigsaw replay: {exc}", file=sys.stderr)
         return 2
 
-    if not Path(args.log).is_file():
-        print(f"jigsaw replay: no such log: {args.log}", file=sys.stderr)
-        return 2
-    try:
-        log = DecisionLog(args.log)
-    except (RuntimeError, sqlite3.Error) as exc:
-        print(f"jigsaw replay: can't open {args.log}: {exc}", file=sys.stderr)
+    log = _open(args.log)
+    if log is None:
         return 2
     with log:
         report = replay_gate(log, gate, **filters) if gate else replay_ladder(log, ladder, **filters)

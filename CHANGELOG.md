@@ -17,6 +17,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `--game`, `--actor`, `--kind`, `--since-turn`. It prints how many rows escalated before and
   now, and how many choices would change (STANDARDS `full-request-replayable`).
 - `Verdict.escalated_because`: the gate's reason, or `""` when it didn't escalate.
+- `jigsaw concordance LOG [--game G]` (and `jigsaw.report.concordance`): per game and kind of
+  decision, how many decisions escalated, how many of those a higher rung answered after a
+  cheap rung had answered ("compared"), and how often the two agreed (STANDARDS
+  `gate-concordance-report`).
 
 ## [0.2.0] - 2026-11-05
 
