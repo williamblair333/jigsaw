@@ -104,7 +104,8 @@ def test_replay_gate_with_a_wider_margin_escalates_more(tmp_path: Path) -> None:
 
     report = replay_gate(log, Gate(GateConfig(margin=0.9, cadence=0)))
 
-    assert [r.logged_escalated != "" for r in report.rows] == [True, True, False]  # newest first
+    assert [r.turn for r in report.rows] == [1, 2, 3]  # oldest first, the order they happened
+    assert [r.logged_escalated != "" for r in report.rows] == [False, True, True]
     assert all(r.new_escalated for r in report.rows)
     assert report.escalated_before == 2 and report.escalated_now == 3
 
@@ -128,6 +129,22 @@ def test_replay_gate_counts_quiet_rows_where_model_agreed_as_unchanged(tmp_path:
 
     assert report.escalated_now == 0
     assert report.changed_choices == 0
+
+
+def test_same_gate_replay_changes_nothing_even_for_an_empty_cheap_choice(tmp_path: Path) -> None:
+    class Empty:
+        rung = 2
+
+        def decide(self, req: Request) -> Verdict | None:
+            return Verdict(choice="", rung=2, reason="do nothing")
+
+    log = _campaign(tmp_path / "d.db")
+    Ladder([Empty()], Gate(GateConfig(cadence=0)), log).decide(_req(4, 0.9, 0.1))
+
+    report = replay_gate(log, Gate(GateConfig(cadence=0)))
+
+    assert report.escalated_now == report.escalated_before
+    assert report.changed_choices == 0 and report.needs_model == 0
 
 
 def test_replay_gate_skips_rows_without_a_stored_request(tmp_path: Path) -> None:
@@ -206,3 +223,50 @@ def test_cli_rejects_an_unknown_gate_setting(tmp_path: Path, capsys: pytest.Capt
     rc = main(["replay", str(tmp_path / "d.db"), "--gate", "marjin=0.2"])
     assert rc == 2
     assert "marjin" in capsys.readouterr().err
+
+
+def test_cli_refuses_a_missing_log_and_creates_nothing(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    missing = tmp_path / "typo" / "d.db"
+    rc = main(["replay", str(missing), "--gate", "margin=0.2"])
+    assert rc == 2
+    assert "no such log" in capsys.readouterr().err
+    assert not missing.parent.exists()
+
+
+def test_cli_reports_a_log_from_a_newer_jigsaw_cleanly(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    path = tmp_path / "d.db"
+    DecisionLog(path).close()
+    with sqlite3.connect(path) as conn:
+        conn.execute(f"PRAGMA user_version = {SCHEMA_VERSION + 1}")
+    rc = main(["replay", str(path), "--gate", "margin=0.2"])
+    assert rc == 2
+    assert "newer" in capsys.readouterr().err
+
+
+def test_cli_warns_when_nothing_could_be_replayed(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    path = tmp_path / "d.db"
+    with DecisionLog(path) as log:
+        log.record(Decision(game="g", turn=1, actor="a", kind="k", situation="s", rung=2, choice="x"))
+    rc = main(["replay", str(path), "--gate", "margin=0.2"])
+    assert rc == 1
+    assert "no row could be replayed" in capsys.readouterr().err
+
+
+def test_cli_reports_a_factory_that_raises(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _campaign(tmp_path / "d.db").close()
+    (tmp_path / "broken.py").write_text("def make():\n    raise TypeError('missing api key')\n")
+    monkeypatch.syspath_prepend(str(tmp_path))
+
+    rc = main(["replay", str(tmp_path / "d.db"), "--ladder", "broken:make"])
+
+    err = capsys.readouterr().err
+    assert rc == 2
+    assert "broken:make raised TypeError: missing api key" in err

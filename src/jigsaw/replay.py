@@ -72,7 +72,8 @@ class ReplayReport(BaseModel):
 
 
 def _logged(log: DecisionLog, filters: dict[str, Any], report: ReplayReport) -> Iterator[tuple[Decision, Request]]:
-    for d in log.query(**filters):
+    # oldest first, so a decider that keeps state sees the campaign in the order it happened
+    for d in reversed(log.query(**filters)):
         if d.request is None:
             assert d.id is not None
             report.skipped.append(d.id)
@@ -93,7 +94,9 @@ def _cheap_verdict(d: Decision) -> Verdict | None:
     """What the cheap rungs answered when this row was logged, or None if none did."""
     if d.cheap_choice is not None and d.cheap_rung is not None:
         return Verdict(choice=d.cheap_choice, rung=d.cheap_rung, reason="logged cheap answer")
-    if not d.escalated_because and d.choice:
+    # The gate only stays quiet when a cheap rung answered (no answer is "novelty"), so a quiet
+    # row's final choice is the cheap answer, even when that choice is "".
+    if not d.escalated_because:
         return Verdict(choice=d.choice, rung=d.rung, reason="logged answer")
     return None
 

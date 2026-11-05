@@ -2,6 +2,8 @@
 
 import argparse
 import importlib
+from pathlib import Path
+import sqlite3
 import sys
 from typing import Any
 
@@ -29,7 +31,11 @@ def _ladder(spec: str) -> Ladder:
     module_name, sep, attr = spec.partition(":")
     if not sep:
         raise ValueError(f"expected module:factory, got {spec!r}")
-    ladder = getattr(importlib.import_module(module_name), attr)()
+    factory = getattr(importlib.import_module(module_name), attr)
+    try:
+        ladder = factory()
+    except Exception as exc:
+        raise ValueError(f"{spec} raised {type(exc).__name__}: {exc}") from exc
     if not isinstance(ladder, Ladder):
         raise ValueError(f"{spec} returned {type(ladder).__name__}, not a Ladder")
     return ladder
@@ -44,7 +50,8 @@ def main(argv: list[str] | None = None) -> int:
         description=(
             "Rerun logged decisions offline. --gate tries new gate settings and runs no "
             "deciders, so it costs nothing. --ladder runs your candidate ladder's deciders for "
-            "real: model rungs make real calls. Nothing is written to any log."
+            "real: model rungs make real calls. Replay records no decisions, but opening a log "
+            "from an older Jigsaw upgrades its layout, as any Jigsaw does."
         ),
     )
     rp.add_argument("log", help="path to a decision log (.db)")
@@ -69,9 +76,21 @@ def main(argv: list[str] | None = None) -> int:
         print(f"jigsaw replay: {exc}", file=sys.stderr)
         return 2
 
-    with DecisionLog(args.log) as log:
+    if not Path(args.log).is_file():
+        print(f"jigsaw replay: no such log: {args.log}", file=sys.stderr)
+        return 2
+    try:
+        log = DecisionLog(args.log)
+    except (RuntimeError, sqlite3.Error) as exc:
+        print(f"jigsaw replay: can't open {args.log}: {exc}", file=sys.stderr)
+        return 2
+    with log:
         report = replay_gate(log, gate, **filters) if gate else replay_ladder(log, ladder, **filters)
     print(report.summary())
+    if not report.rows and report.skipped:
+        print("jigsaw replay: no row could be replayed; every matching row was logged before "
+              "Jigsaw stored requests (v0.3.0)", file=sys.stderr)
+        return 1
     return 0
 
 

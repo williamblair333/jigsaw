@@ -74,8 +74,10 @@ choice would change: 1
 That run calls no model: the cheap rung's answer is already in the log. The recruit decision
 (0.62 vs 0.58) is no longer a close call, so it would stay with the cheap scorer's spearmen
 instead of the model's archers. `--ladder package.module:factory` runs a whole candidate ladder instead. Its
-deciders run for real, so a model rung makes real calls. Replay never writes to any log. In
-Python, use `jigsaw.replay.replay_gate` and `replay_ladder`.
+deciders run for real, so a model rung makes real calls. Replay records no decisions, though
+opening a log from an older Jigsaw upgrades its layout, as any Jigsaw does. Rows logged before
+v0.3.0 have no stored request, so replay skips them and says so. In Python, use
+`jigsaw.replay.replay_gate` and `replay_ladder`.
 
 ## Try it
 
