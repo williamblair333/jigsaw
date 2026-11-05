@@ -1,11 +1,11 @@
 # Handoff
 
-## 2026-11-05: every STANDARDS item done; v0.7.0; Parley on v0.7.0
+## 2026-11-05: every STANDARDS item done; v0.8.0; Parley on v0.8.0
 
 **State:**
-- `main` is at v0.7.0, tagged on Gitea and the GitHub mirror.
-- Parley's pin moves to v0.7.0 (bill/mtw2#394, merged).
-- 153 tests pass. Pyright strict reports 0 errors.
+- `main` is at v0.8.0, tagged on Gitea and the GitHub mirror.
+- Parley's pin is v0.8.0 (bill/mtw2#395, merged).
+- 167 tests pass. Pyright strict reports 0 errors.
 - All 19 STANDARDS items are done. The 3 ideas are untested: `shadow-audit-sample`, `skip-lot-gate`, and `holdings-for-distillation`.
 
 **Built today:**
@@ -15,6 +15,7 @@
 - v0.5.0: the intent contract (`jigsaw.intent`, `Ladder(expanders=...)`, replan once, model rungs must answer with an intent once expanders are set), and the `first-run` CI job in a clean container.
 - v0.6.0: `Request.trace`. A rung asked after a failure sees what failed below it, and a caller can pass in failures from the game.
 - v0.7.0: rung-2 utility scoring (`jigsaw.utility`: `UtilityDecider`, considerations, response curves, Mark's compensation) with the gate judging close calls on the decider's own scores, and resource reservation (`jigsaw.world.Budget`, `Verdict.costs`, `Ladder(budget=)`).
+- v0.8.0: persona-weight intents. `Blackboard` holds weights per actor. `PersonaExpander(blackboard, allowed=)` checks them, and a new optional expander step, `commit(req, intent)`, writes them only for the answer that stands. `Consideration(persona=)` with `UtilityDecider(blackboard=)` reads them; a zero value stays a veto. Every intent type in spec §5 is built.
 - Parley's logs: all 18 are schema 0, so `jigsaw concordance` compares 0 rows. Of the model ruler turns in the three biggest logs, 175 of 662 (26%) returned no orders. The findings went to the mtw2 session, which filed them in its `_review/`. It will message this repo before it starts the set_tax rung-2 rule and the quiet-turn gate.
 
 **How the repo runs:**
@@ -31,8 +32,9 @@
 
 **Next:**
 - Wait for mtw2's message, then help it adopt the pieces: a `UtilityDecider` for set_tax, `Budget` for the turn's gold, `legality=` from `validate.py`, and expanders for its first intents. Engine changes stay here, and pack code stays in Parley.
-- Persona-weight intents (spec §5) need a blackboard that rungs 1–2 read; the rest of spec §2 (derived maps, compact summaries) isn't built.
+- Spec §2's derived maps and compact summaries, and §7 distillation, wait for Parley data: distillation needs a full campaign logged with v0.5.0 or later.
 - Test the 3 STANDARDS ideas on a v0.5.0-or-later Parley campaign log with `jigsaw concordance` and `jigsaw replay`.
+- No more Parley pin bumps unless mtw2 asks. It knows v0.8.0 is the last engine release for now.
 
 ## 2026-11-04: product brief and expert bar
 
