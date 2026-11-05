@@ -375,7 +375,7 @@ class Ladder:
                 # a gate that learns from agreement (SkipLotGate) hears how this one went
                 observe = getattr(self.gate, "observe", None)
                 if callable(observe) and cheap_verdict is not None:
-                    observe(req.kind, higher_verdict.choice == cheap_verdict.choice)
+                    observe(req, higher_verdict.choice == cheap_verdict.choice, gate_reason)
             elif cheap_verdict is not None:
                 final_verdict = cheap_verdict.model_copy(
                     update={"reason": f"{gate_reason} (no higher rung available); {cheap_verdict.reason}"}

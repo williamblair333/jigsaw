@@ -117,7 +117,7 @@ def replay_gate(log: DecisionLog, gate: Gate, **filters: Any) -> ReplayReport:
         observe = getattr(gate, "observe", None)
         if (callable(observe) and reason and d.escalated_because and d.cheap_choice is not None
                 and d.cheap_rung is not None and d.rung > d.cheap_rung):
-            observe(d.kind, d.choice == d.cheap_choice)
+            observe(req, d.choice == d.cheap_choice, reason)
         if not reason:
             choice, rung = (cheap.choice, cheap.rung) if cheap else ("", 0)
         elif d.escalated_because:

@@ -53,15 +53,15 @@ def test_escalates_normally_until_the_streak() -> None:
 def test_one_disagreement_snaps_back_to_always() -> None:
     gate = _gate(streak=2)
     for _ in range(2):
-        gate.observe("recruit", agreed=True)
+        gate.observe(_close(0), True, "close call (0.55 vs 0.50)")
     assert gate.check(_close(1), Verdict(choice="spears", rung=2, reason="r")) == ""
-    gate.observe("recruit", agreed=False)
+    gate.observe(_close(0), False, "close call (0.55 vs 0.50)")
     assert gate.check(_close(2), Verdict(choice="spears", rung=2, reason="r")).startswith("close call")
 
 
 def test_streaks_are_per_kind() -> None:
     gate = _gate(streak=1)
-    gate.observe("recruit", agreed=True)
+    gate.observe(_close(0), True, "close call (0.55 vs 0.50)")
     v = Verdict(choice="x", rung=2, reason="r")
     assert gate.check(_close(1, kind="recruit"), v) == ""
     assert gate.check(_close(1, kind="build"), v).startswith("close call")
@@ -69,18 +69,18 @@ def test_streaks_are_per_kind() -> None:
 
 def test_sample_still_audits_some_skips() -> None:
     gate = SkipLotGate(GateConfig(cadence=0), streak=1, sample=0.5, rng=random.Random(7))
-    gate.observe("recruit", agreed=True)
+    gate.observe(_close(0), True, "close call (0.55 vs 0.50)")
     v = Verdict(choice="x", rung=2, reason="r")
     reasons = [gate.check(_close(t), v) for t in range(200)]
     audited = sum(1 for r in reasons if r)
     assert 70 < audited < 130                 # about half
     assert all(r.endswith("(skip-lot sample)") for r in reasons if r)
-    assert gate.skipped["recruit"] == 200 - audited
+    assert gate.skipped[("g", "recruit")] == 200 - audited
 
 
 def test_high_stakes_and_human_are_never_skipped() -> None:
     gate = _gate(streak=1)
-    gate.observe("recruit", agreed=True)
+    gate.observe(_close(0), True, "close call (0.55 vs 0.50)")
     v = Verdict(choice="x", rung=2, reason="r")
     assert gate.check(_close(1, stakes=0.9), v).startswith("high stakes")
     assert gate.check(_close(1, human=True), v) == "human involved"
@@ -88,7 +88,7 @@ def test_high_stakes_and_human_are_never_skipped() -> None:
 
 def test_novelty_is_never_skipped() -> None:
     gate = _gate(streak=1)
-    gate.observe("recruit", agreed=True)
+    gate.observe(_close(0), True, "close call (0.55 vs 0.50)")
     assert gate.check(_close(1), None).startswith("novelty")
 
 
@@ -97,7 +97,7 @@ def test_ladder_reports_disagreement_too() -> None:
     ladder = Ladder([Cheap("spears"), Model("archers")], gate)
     for t in range(1, 6):
         assert ladder.decide(_close(t)).rung == 7   # never agrees, so never skips
-    assert gate.streak("recruit") == 0
+    assert gate.streak("g", "recruit") == 0
 
 
 def test_plain_gate_is_unchanged() -> None:
@@ -140,3 +140,22 @@ def test_replay_runs_the_idea_test_offline(tmp_path: Path) -> None:
     assert report.escalated_before == 10
     assert report.escalated_now == 3            # the first three build the streak
     assert report.changed_choices == 0          # the model always agreed: no misses
+
+
+def test_high_stakes_agreements_do_not_build_a_streak() -> None:
+    gate = _gate(streak=2)
+    model = Model()
+    ladder = Ladder([Cheap(), model], gate)
+    for t in range(1, 6):
+        ladder.decide(_close(t, stakes=0.9))     # escalated as high stakes, model agrees
+    assert gate.streak("g", "recruit") == 0
+    assert ladder.decide(_close(6)).rung == 7      # the routine close call is still asked
+
+
+def test_streaks_are_per_game() -> None:
+    gate = _gate(streak=1)
+    gate.observe(_close(0), True, "close call (0.55 vs 0.50)")   # game "g"
+    other = _close(1).model_copy(update={"game": "h"})
+    v = Verdict(choice="x", rung=2, reason="r")
+    assert gate.check(_close(1), v) == ""
+    assert gate.check(other, v).startswith("close call")

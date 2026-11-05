@@ -95,6 +95,16 @@ opening a log from an older Jigsaw upgrades its layout, as any Jigsaw does. Rows
 v0.3.0 have no stored request, so replay skips them and says so. In Python, use
 `jigsaw.replay.replay_gate` and `replay_ladder`.
 
+`SkipLotGate` is one of the STANDARDS ideas (`skip-lot-gate`), borrowed from acceptance sampling
+in manufacturing: after `streak` agreements in a row for a kind of decision in one game, it
+escalates that kind only on a random `sample` of the escalations it would have made, and one
+disagreement sends the kind back to always. Human, high-stakes and novelty escalations are never
+skipped, and they don't count toward a streak either: only close calls and cadence reviews do. Test it on
+a logged campaign with `uv run jigsaw replay LOG --gate cadence=0 --skip-lot streak=20,sample=0.1`:
+"escalated: X logged, Y now" shows the calls saved, and "choice would change" counts the
+decisions where skipping would have lost the model's different answer. The replay feeds the gate
+the logged outcome only when it escalated itself, as a live game would.
+
 ## Try it
 
 You need [uv](https://docs.astral.sh/uv/). This runs offline and needs no API key:

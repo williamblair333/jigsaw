@@ -5,6 +5,13 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+- `jigsaw.skip_lot.SkipLotGate` skips escalations after `streak` agreements in a row for a kind
+  of decision in one game (only close calls and cadence reviews count), samples audits, and
+  resets to always on any disagreement. `jigsaw replay --skip-lot`
+  replays a log through the gate to measure saved calls and changed choices (STANDARDS idea
+  `skip-lot-gate`; its test needs a campaign logged with v0.5.0 or later).
+
 ## [0.8.0] - 2026-11-05
 
 No breaking changes, and the log stays at schema 4. Every intent type in spec §5 is now built.
