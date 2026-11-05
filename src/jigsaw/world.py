@@ -7,14 +7,19 @@ Later decisions in the turn see only what remains.
 """
 
 from collections.abc import Mapping
+import math
 import threading
+
+# Costs that add up to the total in floating point (0.1 + 0.2 vs 0.3) still fit.
+_EPS = 1e-9
 
 
 class Budget:
     """Totals per resource and what's left of them, safe to share between threads.
 
     Call reset() at the start of each turn with the new totals. Call release() when the game
-    rejects an order that was charged, so its resources go back.
+    rejects an order that was charged, so its resources go back. Release before the next
+    reset(): a release after it credits the new turn.
     """
 
     def __init__(self, totals: Mapping[str, float]) -> None:
@@ -24,9 +29,9 @@ class Budget:
         self.reset(totals)
 
     def reset(self, totals: Mapping[str, float]) -> None:
-        bad = {k: v for k, v in totals.items() if v < 0}
+        bad = {k: v for k, v in totals.items() if not (math.isfinite(v) and v >= 0)}
         if bad:
-            raise ValueError(f"budget totals can't be negative: {bad}")
+            raise ValueError(f"budget totals must be finite and not negative: {bad}")
         with self._lock:
             self._totals = dict(totals)
             self._left = dict(totals)
@@ -39,9 +44,11 @@ class Budget:
         for name, cost in costs.items():
             if name not in self._left:
                 return f"no such resource: {name}"
+            if not math.isfinite(cost):
+                return f"cost of {name} must be a finite number ({cost})"
             if cost < 0:
                 return f"cost of {name} can't be negative ({cost:g})"
-            if cost > self._left[name]:
+            if cost > self._left[name] + _EPS:
                 return f"over budget: {name} needs {cost:g}, {self._left[name]:g} left"
         return None
 
@@ -56,7 +63,8 @@ class Budget:
             refusal = self._refusal(costs)
             if refusal is None:
                 for name, cost in costs.items():
-                    self._left[name] -= cost
+                    left = self._left[name] - cost
+                    self._left[name] = 0.0 if left < _EPS else left
             return refusal
 
     def release(self, costs: Mapping[str, float]) -> None:

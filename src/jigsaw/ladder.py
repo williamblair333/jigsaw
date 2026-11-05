@@ -47,8 +47,9 @@ class Verdict(BaseModel):
     escalated_because: str = ""
     # why the log write failed, when it did; the verdict stands and decision_id stays None
     log_error: str | None = None
-    # the pack's legality check on each answer, in order:
-    # {"rung", "choice", "legal": bool, "reason" when refused}; set by Ladder.decide
+    # the pack's legality and budget checks on each answer, in order:
+    # {"rung", "choice", "legal": bool, "reason" when refused}, plus intent attempts
+    # ("intent_id", "attempt") and the budget charge ({"budget": "reserved", "costs"}, no "legal")
     legality: list[dict[str, Any]] = Field(default_factory=list[dict[str, Any]])
     # a model rung's goal, expanded into primitives by the pack's expander for its verb
     intent: Intent | None = None
@@ -259,6 +260,12 @@ class Ladder:
                          intent_id=intent.id)
             return None
         failure: str | None = None
+        # the costs are the answer's, not the plan's: if it can't be paid for, don't plan it
+        if self.budget is not None and v.costs:
+            over = self.budget.affordable(v.costs)
+            if over is not None:
+                self._refuse(decider, req, v, over, checks, intent_id=intent.id)
+                return None
         for attempt in (1, 2):
             tag = {"rung": decider.rung, "choice": v.choice, "intent_id": intent.id,
                    "attempt": attempt}
@@ -376,10 +383,13 @@ class Ladder:
                     reason="no decider answered; the game's own AI keeps it",
                 )
 
+        charge_failed = False
         if self.budget is not None and final_verdict.costs and final_verdict.choice:
-            # charge only the answer that stands; atomic, so threads sharing a budget can't
-            # both spend the last of it
+            # Charge only the answer that stands. Atomic, so threads sharing a budget can't both
+            # spend the last of it. The loser falls back to the game's own AI, deliberately:
+            # its answer was judged with gold that is no longer there.
             refusal = self.budget.reserve(final_verdict.costs)
+            charge_failed = refusal is not None
             if refusal is None:
                 checks.append({"rung": final_verdict.rung, "choice": final_verdict.choice,
                                "budget": "reserved", "costs": dict(final_verdict.costs)})
@@ -410,7 +420,8 @@ class Ladder:
 
         if self.log is not None:
             try:
-                final_verdict = self._record(req, final_verdict, cheap_verdict, gate_reason, errors)
+                final_verdict = self._record(req, final_verdict, cheap_verdict, gate_reason, errors,
+                                             charge_failed)
             except Exception as exc:
                 # Losing one log row is recoverable; losing the turn is not.
                 self.log_failures += 1
@@ -431,11 +442,14 @@ class Ladder:
         cheap_verdict: Verdict | None,
         gate_reason: str,
         errors: list[dict[str, Any]],
+        charge_failed: bool = False,
     ) -> Verdict:
         """Write the decision to the log and return the verdict with its decision_id."""
         assert self.log is not None
         # On an escalation, keep the cheap answer too, so agreement can be measured later.
-        keep_cheap = bool(gate_reason) and cheap_verdict is not None
+        # (also when the budget couldn't pay for the answer that stood: the row says choice "",
+        # and replay must still know what the cheap rung said)
+        keep_cheap = (bool(gate_reason) or charge_failed) and cheap_verdict is not None
         decision = Decision(
             cheap_choice=cheap_verdict.choice if keep_cheap and cheap_verdict else None,
             cheap_rung=cheap_verdict.rung if keep_cheap and cheap_verdict else None,
@@ -447,7 +461,7 @@ class Ladder:
             # scores that match the logged choice: the final rung's, else the cheap rung's
             options=normalise(
                 final_verdict.options
-                or (cheap_verdict.options if cheap_verdict is not None else [])
+                or (cheap_verdict.options if cheap_verdict is not None and not charge_failed else [])
                 or req.options
             ),
             rung=final_verdict.rung,

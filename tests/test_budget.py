@@ -134,3 +134,62 @@ def test_without_a_budget_costs_are_ignored() -> None:
 def test_budget_rejects_negative_totals() -> None:
     with pytest.raises(ValueError):
         Budget({"gold": -1})
+
+
+def test_nan_cost_and_total_are_refused() -> None:
+    b = Budget({"gold": 1000})
+    assert b.reserve({"gold": float("nan")}) == "cost of gold must be a finite number (nan)"
+    assert b.remaining() == {"gold": 1000}
+    with pytest.raises(ValueError):
+        Budget({"gold": float("nan")})
+
+
+def test_float_costs_that_add_up_to_the_total_fit() -> None:
+    b = Budget({"gold": 0.3})
+    assert b.reserve({"gold": 0.1}) is None
+    assert b.reserve({"gold": 0.2}) is None
+    assert b.remaining() == {"gold": 0.0}
+
+
+def test_unaffordable_intent_is_refused_before_planning() -> None:
+    from typing import Any
+
+    from jigsaw.intent import Intent
+
+    class CountingExpander:
+        calls = 0
+
+        def expand(self, req: Request, intent: Intent, failure: str | None) -> list[dict[str, Any]] | None:
+            CountingExpander.calls += 1
+            return [{"op": "march"}]
+
+    class Model:
+        rung = 7
+
+        def decide(self, req: Request) -> Verdict | None:
+            return Verdict(choice="take Milan", rung=7, reason="model",
+                           intent=Intent(verb="take"), costs={"gold": 2000})
+
+    b = Budget({"gold": 1000})
+    v = Ladder([Model()], Gate(), expanders={"take": CountingExpander()}, budget=b).decide(_req(stakes=0.9))
+
+    assert CountingExpander.calls == 0
+    assert "over budget: gold needs 2000, 1000 left" in v.reason
+    assert "replanning" not in v.reason
+
+
+def test_failed_final_charge_keeps_the_cheap_answer_in_the_log(tmp_path) -> None:
+    from jigsaw.decision_log import DecisionLog
+
+    class RacedBudget(Budget):
+        """Says yes when asked, then loses the race when charged."""
+
+        def reserve(self, costs):  # type: ignore[override]
+            return "over budget: gold needs 300, 0 left"
+
+    log = DecisionLog(tmp_path / "d.db")
+    v = Ladder([Wants(2, "spears", gold=300)], QUIET, log, budget=RacedBudget({"gold": 1000})).decide(_req())
+
+    assert (v.choice, v.rung) == ("", 0)
+    row = log.get(v.decision_id)
+    assert (row.cheap_choice, row.cheap_rung) == ("spears", 2)
