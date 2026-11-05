@@ -74,8 +74,8 @@ standards:
     area: game AI
     bar: The ladder runs a pack-supplied legality check on a verdict's primitives before returning it, and an illegal verdict passes up instead of being sent
     why: neither planners nor models can be trusted with live game constraints
-    status: partial
-    evidence: src/jigsaw/decision_log.py (a legality field is logged; the ladder never checks it)
+    status: done
+    evidence: tests/test_legality.py
   - id: ci-on-every-pr
     area: release
     bar: Gitea Actions runs `just test` on Python 3.11, 3.12 and 3.13 for every PR, and merging needs it green

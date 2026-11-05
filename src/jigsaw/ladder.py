@@ -1,6 +1,6 @@
 """Decision ladder and gate for Jigsaw game AI."""
 
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 import logging
 import threading
 from typing import Any, Protocol, runtime_checkable
@@ -41,6 +41,13 @@ class Verdict(BaseModel):
     escalated_because: str = ""
     # why the log write failed, when it did; the verdict stands and decision_id stays None
     log_error: str | None = None
+    # the pack's legality check on each answer, in order:
+    # {"rung", "choice", "legal": bool, "reason" when refused}; set by Ladder.decide
+    legality: list[dict[str, Any]] = Field(default_factory=list)
+
+
+# A pack's legality check: return None when the verdict can be sent, or the reason it can't.
+Legality = Callable[["Request", Verdict], "str | None"]
 
 
 @runtime_checkable
@@ -135,6 +142,10 @@ class Ladder:
     so a decider that times out keeps running in the background until it returns. Give
     network deciders their own client timeout too, and keep them safe to call from another
     thread while an earlier call is still running.
+
+    legality is the pack's last gate before a move reaches the game. It runs on every answer a
+    decider gives. An answer it refuses counts as passing up, and so does one it can't check
+    because the check itself raised: an unverified move is never returned.
     """
 
     def __init__(
@@ -143,16 +154,45 @@ class Ladder:
         gate: Gate,
         log: DecisionLog | None = None,
         decider_timeout: float | None = None,
+        legality: Legality | None = None,
     ) -> None:
         self.deciders = list(deciders)
         self.gate = gate
         self.log = log
         self.decider_timeout = decider_timeout
+        self.legality = legality
         # log writes that failed; each such verdict was still returned, with log_error set
         self.log_failures = 0
 
-    def _ask(self, decider: Decider, req: Request, errors: list[dict[str, Any]]) -> Verdict | None:
-        """Ask one decider. A raise or a timeout is recorded in errors and returns None."""
+    def _ask(
+        self,
+        decider: Decider,
+        req: Request,
+        errors: list[dict[str, Any]],
+        checks: list[dict[str, Any]],
+    ) -> Verdict | None:
+        """Ask one decider, then run the legality check on its answer. Refused means None."""
+        v = self._call(decider, req, errors)
+        if v is None or self.legality is None:
+            return v
+        try:
+            refusal = self.legality(req, v)
+        except Exception as exc:
+            refusal = f"legality check raised {type(exc).__name__}: {exc}"
+        entry: dict[str, Any] = {"rung": decider.rung, "choice": v.choice, "legal": refusal is None}
+        if refusal is None:
+            checks.append(entry)
+            return v
+        entry["reason"] = refusal
+        checks.append(entry)
+        _log.warning(
+            "rung %d answer %r refused by the legality check on %s/%s turn %d: %s",
+            decider.rung, v.choice, req.game, req.kind, req.turn, refusal,
+        )
+        return None
+
+    def _call(self, decider: Decider, req: Request, errors: list[dict[str, Any]]) -> Verdict | None:
+        """Call one decider. A raise or a timeout is recorded in errors and returns None."""
         try:
             if self.decider_timeout is None:
                 return decider.decide(req)
@@ -188,10 +228,11 @@ class Ladder:
         cheap_deciders = [d for d in sorted_deciders if d.rung < escalate_rung]
         higher_deciders = [d for d in sorted_deciders if d.rung >= escalate_rung]
         errors: list[dict[str, Any]] = []
+        checks: list[dict[str, Any]] = []
 
         cheap_verdict: Verdict | None = None
         for decider in cheap_deciders:
-            v = self._ask(decider, req, errors)
+            v = self._ask(decider, req, errors, checks)
             if v is not None:
                 cheap_verdict = v
                 break
@@ -210,7 +251,7 @@ class Ladder:
         else:
             higher_verdict: Verdict | None = None
             for decider in higher_deciders:
-                v = self._ask(decider, req, errors)
+                v = self._ask(decider, req, errors, checks)
                 if v is not None:
                     higher_verdict = v.model_copy(
                         update={"reason": f"{gate_reason}; {v.reason}"}
@@ -236,7 +277,16 @@ class Ladder:
                 update={"reason": f"{final_verdict.reason}; {failed}", "decider_errors": errors}
             )
 
-        final_verdict = final_verdict.model_copy(update={"escalated_because": gate_reason})
+        refused = [c for c in checks if not c["legal"]]
+        if refused:
+            text = "; ".join(f"rung {c['rung']} illegal ({c['reason']})" for c in refused)
+            final_verdict = final_verdict.model_copy(
+                update={"reason": f"{final_verdict.reason}; {text}"}
+            )
+
+        final_verdict = final_verdict.model_copy(
+            update={"escalated_because": gate_reason, "legality": checks}
+        )
 
         if self.log is not None:
             try:
@@ -279,6 +329,7 @@ class Ladder:
             escalated_because=gate_reason,
             choice=final_verdict.choice,
             primitives=final_verdict.primitives,
+            legality=final_verdict.legality,
             decider_errors=errors,
             request=req.model_dump(),
         )
