@@ -182,6 +182,11 @@ and if that fails too the answer passes up. Once `expanders` is set, a model run
 up) that returns primitives instead of an intent is refused, so a model never emits raw game ids.
 The intent is logged in a new `intent` column (schema 4).
 
+`Request.trace` lists what already failed on a decision, oldest first. A caller can pass its own
+entries, for example a step the game rejected, and they come first. A rung asked after a failure
+gets a copy of the request whose trace holds each decider error and refusal below it, so a model
+can see why the cheap answer was refused. The log stores the request as the caller passed it.
+
 A failed log write (a full disk, a locked file) doesn't lose the decision either. The verdict
 comes back with `decision_id=None` and `log_error` set, and `ladder.log_failures` counts them.
 Watch that counter if the log matters to you: a log that fails every write still lets the game

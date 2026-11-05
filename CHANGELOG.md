@@ -5,6 +5,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+- `Request.trace` lists what already failed on a decision, oldest first. A caller can pass its own
+  entries, like a step the game rejected, and they come first. A rung asked after a failure
+  gets a copy with each decider error and refusal below it, so a model sees why the cheap answer
+  was refused. The log stores the request as the caller passed it.
+
 ## [0.5.0] - 2026-11-05
 
 Logs move to schema 4 the first time v0.5.0 opens them. v0.2.0 through v0.4.0 refuse a
