@@ -122,8 +122,8 @@ standards:
     area: release
     bar: The package ships py.typed and passes pyright in strict mode
     why: pack authors implement the Decider protocol, and types are its documentation
-    status: open
-    evidence: no py.typed marker
+    status: done
+    evidence: src/jigsaw/py.typed
   - id: release-practice
     area: release
     bar: Every tag has a CHANGELOG section and a version bump, and breaking changes get one minor release of DeprecationWarning first

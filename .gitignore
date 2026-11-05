@@ -1,3 +1,6 @@
+# Agent worktrees (local only)
+.claude/worktrees/
+
 # Review queues (local only)
 _review/
 _reviewed/

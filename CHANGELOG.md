@@ -6,6 +6,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- The package ships `py.typed`, so a type checker reads Jigsaw's annotations in a project that
+  imports it. Pyright runs in strict mode in CI on all three Pythons, and locally with
+  `just typecheck`. Strict mode found 12 errors. Fixing them changed only annotations: list
+  fields now name their element type, an always-true `isinstance` check went, and the CLI
+  narrows an Optional (STANDARDS `typed-package`).
 - `Ladder(legality=check)`: the pack's last gate before a move reaches the game. `check(request,
   verdict)` returns `None` when the verdict can be sent, or the reason it can't. It runs on
   every answer a decider gives. A refused answer counts as passing up, and so does one whose

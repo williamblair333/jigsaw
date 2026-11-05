@@ -112,7 +112,11 @@ def main(argv: list[str] | None = None) -> int:
     if log is None:
         return 2
     with log:
-        report = replay_gate(log, gate, **filters) if gate else replay_ladder(log, ladder, **filters)
+        if gate is not None:
+            report = replay_gate(log, gate, **filters)
+        else:
+            assert ladder is not None  # argparse requires exactly one of --gate and --ladder
+            report = replay_ladder(log, ladder, **filters)
     print(report.summary())
     if not report.rows and report.skipped:
         print("jigsaw replay: no row could be replayed; every matching row was logged before "

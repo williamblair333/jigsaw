@@ -74,12 +74,12 @@ class Decision(BaseModel):
     actor: str
     kind: str
     situation: str
-    options: list[Option] = Field(default_factory=list)
+    options: list[Option] = Field(default_factory=list[Option])
     rung: int = Field(ge=0, le=7)
     escalated_because: str = ""
     choice: str
-    primitives: list[dict[str, Any]] = Field(default_factory=list)
-    legality: list[dict[str, Any]] = Field(default_factory=list)
+    primitives: list[dict[str, Any]] = Field(default_factory=list[dict[str, Any]])
+    legality: list[dict[str, Any]] = Field(default_factory=list[dict[str, Any]])
     outcome: str | None = None
     outcome_turn: int | None = None
     created_at: str = Field(default_factory=_utc_now_iso)
@@ -90,7 +90,7 @@ class Decision(BaseModel):
     cheap_rung: int | None = Field(default=None, ge=0, le=7)
     # Deciders that raised or timed out on this decision and were treated as passing up,
     # as {"rung": int, "error": "ExceptionType: message"}.
-    decider_errors: list[dict[str, Any]] = Field(default_factory=list)
+    decider_errors: list[dict[str, Any]] = Field(default_factory=list[dict[str, Any]])
     # The whole Request the ladder was asked (stakes, human, context, raw option scores), as
     # Request.model_dump() gives it. None for rows logged before schema 3. Values that can't
     # be stored as JSON are kept as their repr() text.
@@ -106,7 +106,7 @@ class DecisionLog:
 
     def __init__(self, path: str | Path) -> None:
         """Open the decision log database at path and ensure schema exists."""
-        if isinstance(path, (str, Path)) and str(path) != ":memory:":
+        if str(path) != ":memory:":
             Path(path).parent.mkdir(parents=True, exist_ok=True)
         self._path = path
         self._lock = threading.RLock()

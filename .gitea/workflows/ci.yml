@@ -18,6 +18,8 @@ jobs:
       - uses: astral-sh/setup-uv@v10.2.0   # setup-uv publishes no floating major tag
       - name: install (lockfile must be up to date)
         run: uv sync --locked
+      - name: types (pyright strict)
+        run: uv run pyright
       - name: tests
         run: uv run pytest -q
       - name: quickstart runs

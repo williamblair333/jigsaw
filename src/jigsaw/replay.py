@@ -39,9 +39,9 @@ class ReplayRow(BaseModel):
 
 
 class ReplayReport(BaseModel):
-    rows: list[ReplayRow] = Field(default_factory=list)
+    rows: list[ReplayRow] = Field(default_factory=list[ReplayRow])
     # ids of rows logged before the request was stored (schema 3), so they can't be replayed
-    skipped: list[int] = Field(default_factory=list)
+    skipped: list[int] = Field(default_factory=list[int])
 
     @property
     def escalated_before(self) -> int:
