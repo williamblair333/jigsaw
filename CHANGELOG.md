@@ -42,6 +42,9 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   counts these, and each one is a warning on the `jigsaw` logger (STANDARDS
   `log-write-failure-contained`).
 
+### Documentation
+- README states the public API (`jigsaw.__all__` and the CLI) and the deprecation policy: one minor release of DeprecationWarning before a breaking change (STANDARDS `public-api-declared`, `release-practice`).
+
 ## [0.3.0] - 2026-11-05
 
 Logs move to schema 3 the first time v0.3.0 opens them. v0.2.0 refuses a schema-3 log, so

@@ -116,8 +116,8 @@ standards:
     area: release
     bar: jigsaw/__init__.py exports the public API with __all__, and the README states that anything outside it can change without a major bump
     why: without a declared surface every helper becomes a promise
-    status: partial
-    evidence: src/jigsaw/__init__.py (__all__ declares 10 names; the policy isn't written down)
+    status: done
+    evidence: README.md
   - id: typed-package
     area: release
     bar: The package ships py.typed and passes pyright in strict mode
@@ -128,8 +128,8 @@ standards:
     area: release
     bar: Every tag has a CHANGELOG section and a version bump, and breaking changes get one minor release of DeprecationWarning first
     why: PEP 387; Parley pins tags
-    status: partial
-    evidence: CHANGELOG.md (tags and changelog exist; no deprecation policy)
+    status: done
+    evidence: README.md
 ideas:
   - id: shadow-audit-sample
     idea: Send a random 2-5% of non-escalated decisions to the strong rung in shadow (logged, not acted on) to measure the gate's miss rate
