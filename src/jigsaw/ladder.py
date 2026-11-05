@@ -23,7 +23,11 @@ class Request(BaseModel):
     options: list[Option] = Field(default_factory=list[Option])
     stakes: float = 0.0
     human: bool = False
-    context: dict[str, Any] = Field(default_factory=dict)
+    context: dict[str, Any] = Field(default_factory=dict[str, Any])
+    # What already failed on this decision, oldest first: entries the caller passes in (say,
+    # "the game rejected step 2"), then each decider error and refusal the ladder met on the way
+    # up. A rung asked after a failure gets a copy of the request with the trace so far.
+    trace: list[dict[str, Any]] = Field(default_factory=list[dict[str, Any]])
 
 
 class Verdict(BaseModel):
@@ -306,10 +310,20 @@ class Ladder:
         higher_deciders = [d for d in sorted_deciders if d.rung >= escalate_rung]
         errors: list[dict[str, Any]] = []
         checks: list[dict[str, Any]] = []
+        trace: list[dict[str, Any]] = list(req.trace)
+
+        def ask(decider: Decider) -> Verdict | None:
+            """Ask one decider with the trace so far, then add what failed to the trace."""
+            seen_errors, seen_checks = len(errors), len(checks)
+            asked = req if len(trace) == len(req.trace) else req.model_copy(update={"trace": list(trace)})
+            v = self._ask(decider, asked, errors, checks)
+            trace.extend(errors[seen_errors:])
+            trace.extend(c for c in checks[seen_checks:] if not c["legal"])
+            return v
 
         cheap_verdict: Verdict | None = None
         for decider in cheap_deciders:
-            v = self._ask(decider, req, errors, checks)
+            v = ask(decider)
             if v is not None:
                 cheap_verdict = v
                 break
@@ -328,7 +342,7 @@ class Ladder:
         else:
             higher_verdict: Verdict | None = None
             for decider in higher_deciders:
-                v = self._ask(decider, req, errors, checks)
+                v = ask(decider)
                 if v is not None:
                     higher_verdict = v.model_copy(
                         update={"reason": f"{gate_reason}; {v.reason}"}
