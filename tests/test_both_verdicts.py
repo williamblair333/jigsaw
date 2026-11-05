@@ -126,7 +126,7 @@ def test_cheap_fields_round_trip_through_query(tmp_path: Path) -> None:
 def test_new_file_gets_current_version(tmp_path: Path) -> None:
     path = tmp_path / "d.db"
     DecisionLog(path).close()
-    assert _user_version(path) == SCHEMA_VERSION == 2
+    assert _user_version(path) == SCHEMA_VERSION
 
 
 def test_v1_file_migrates_forward_and_keeps_its_rows(tmp_path: Path) -> None:

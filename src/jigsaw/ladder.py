@@ -37,6 +37,8 @@ class Verdict(BaseModel):
     decision_id: int | None = None
     # deciders that raised or timed out on the way, treated as passing up; set by Ladder.decide
     decider_errors: list[dict[str, Any]] = Field(default_factory=list)
+    # the gate's reason for escalating, or "" when it didn't; set by Ladder.decide
+    escalated_because: str = ""
 
 
 @runtime_checkable
@@ -230,6 +232,8 @@ class Ladder:
                 update={"reason": f"{final_verdict.reason}; {failed}", "decider_errors": errors}
             )
 
+        final_verdict = final_verdict.model_copy(update={"escalated_because": gate_reason})
+
         if self.log is not None:
             # On an escalation, keep the cheap answer too, so agreement can be measured later.
             keep_cheap = bool(gate_reason) and cheap_verdict is not None
@@ -247,6 +251,7 @@ class Ladder:
                 choice=final_verdict.choice,
                 primitives=final_verdict.primitives,
                 decider_errors=errors,
+                request=req.model_dump(),
             )
             final_verdict = final_verdict.model_copy(update={"decision_id": self.log.record(decision)})
 

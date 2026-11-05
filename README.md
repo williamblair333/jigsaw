@@ -57,6 +57,26 @@ The log file carries a version number. When a newer Jigsaw opens a log made by a
 adds the missing columns and keeps every row. v0.1.0 can still read and write a newer file,
 since the new columns may be empty. From v0.2.0 on, Jigsaw refuses a file newer than itself.
 
+**Replay** reruns a log offline, which lets you tune the gate on a campaign you've already
+played. Each row keeps the whole request, so you can ask "what if the close-call margin were
+0.02 instead of 0.1?". On the quickstart's log:
+
+```bash
+uv run examples/quickstart.py demo.db
+uv run jigsaw replay demo.db --gate margin=0.02
+```
+```
+2 rows replayed, 0 skipped (logged before the request was stored)
+escalated: 1 logged, 0 now
+choice would change: 1
+```
+
+That run calls no model: the cheap rung's answer is already in the log. The recruit decision
+(0.62 vs 0.58) is no longer a close call, so it would stay with the cheap scorer's spearmen
+instead of the model's archers. `--ladder package.module:factory` runs a whole candidate ladder instead. Its
+deciders run for real, so a model rung makes real calls. Replay never writes to any log. In
+Python, use `jigsaw.replay.replay_gate` and `replay_ladder`.
+
 ## Try it
 
 You need [uv](https://docs.astral.sh/uv/). This runs offline and needs no API key:

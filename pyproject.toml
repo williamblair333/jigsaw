@@ -6,6 +6,9 @@ requires-python = ">=3.11"
 license = "GPL-3.0-or-later"
 dependencies = ["pydantic>=2"]
 
+[project.scripts]
+jigsaw = "jigsaw.cli:main"
+
 [dependency-groups]
 dev = ["pytest>=8"]
 

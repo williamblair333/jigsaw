@@ -32,8 +32,8 @@ standards:
     area: evaluation
     bar: Each log row stores the whole Request (stakes, human, context, options), and a replay command reruns any logged rows through a candidate gate or ladder offline
     why: thresholds and prompts get tuned against recorded situations, not live games
-    status: open
-    evidence: stakes, human and context are not in the decisions table
+    status: done
+    evidence: tests/test_replay.py
   - id: schema-versioned
     area: data
     bar: The log records its schema version in PRAGMA user_version and migrates older files forward on open; a test opens a v1 file with current code
