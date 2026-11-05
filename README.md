@@ -180,6 +180,10 @@ TAX = UtilityDecider(
 
 The verdict carries each option's score, so the gate escalates when the top two scores are close, and the log keeps those scores.
 
+### A budget for the turn
+
+Many decisions in one turn often draw on the same gold or recruitment slots. `Budget({"gold": 3000, "recruit_slots": 4})` holds the turn's totals; call `reset(...)` each turn. A decider puts what its answer uses up in `Verdict(costs={"gold": 400})`. `Ladder(budget=budget)` refuses an answer the budget can't cover, so it passes up like an illegal one, and charges only the answer that stands. `reserve` is all-or-nothing and safe across threads, so two seats sharing a budget can't both spend its last gold. Call `budget.release(costs)` when the game rejects an order that was charged.
+
 A decider returns `None` to pass the decision to the next rung. If no rung answers, the verdict
 has `choice=""` and `rung=0`, and its `reason` says the game's own AI keeps the decision. If the
 gate escalates but no model rung answers, you get the cheap rung's verdict, and its `reason`

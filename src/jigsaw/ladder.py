@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field
 
 from jigsaw.decision_log import Decision, DecisionLog, Option
 from jigsaw.intent import Expander, Intent
+from jigsaw.world import Budget
 
 _log = logging.getLogger("jigsaw")
 
@@ -46,14 +47,17 @@ class Verdict(BaseModel):
     escalated_because: str = ""
     # why the log write failed, when it did; the verdict stands and decision_id stays None
     log_error: str | None = None
-    # the pack's legality check on each answer, in order:
-    # {"rung", "choice", "legal": bool, "reason" when refused}; set by Ladder.decide
+    # the pack's legality and budget checks on each answer, in order:
+    # {"rung", "choice", "legal": bool, "reason" when refused}, plus intent attempts
+    # ("intent_id", "attempt") and the budget charge ({"budget": "reserved", "costs"}, no "legal")
     legality: list[dict[str, Any]] = Field(default_factory=list[dict[str, Any]])
     # a model rung's goal, expanded into primitives by the pack's expander for its verb
     intent: Intent | None = None
     # the options as this decider scored them (a utility rung sets these); when present, the
     # gate's close-call check and the log use them instead of the request's own scores
     options: list[Option] = Field(default_factory=list[Option])
+    # what carrying out this answer uses up, per resource; a Ladder with a budget charges it
+    costs: dict[str, float] = Field(default_factory=dict[str, float])
 
 
 # A pack's legality check: return None when the verdict can be sent, or the reason it can't.
@@ -167,6 +171,7 @@ class Ladder:
         decider_timeout: float | None = None,
         legality: Legality | None = None,
         expanders: Mapping[str, Expander] | None = None,
+        budget: Budget | None = None,
     ) -> None:
         self.deciders = list(deciders)
         self.gate = gate
@@ -175,17 +180,23 @@ class Ladder:
         self.legality = legality
         # verb -> the pack's expander. When set, model rungs must answer with an intent.
         self.expanders = dict(expanders) if expanders is not None else None
+        # the turn's resources; an answer it can't cover passes up, and the final one is charged
+        self.budget = budget
         # log writes that failed; each such verdict was still returned, with log_error set
         self.log_failures = 0
 
     def _check(self, req: Request, v: Verdict) -> str | None:
-        """The legality check's refusal, or None when the verdict may be sent."""
-        if self.legality is None:
-            return None
-        try:
-            return self.legality(req, v)
-        except Exception as exc:
-            return f"legality check raised {type(exc).__name__}: {exc}"
+        """Why the verdict can't be sent (illegal, or more than the budget has left), or None."""
+        if self.legality is not None:
+            try:
+                refusal = self.legality(req, v)
+            except Exception as exc:
+                refusal = f"legality check raised {type(exc).__name__}: {exc}"
+            if refusal is not None:
+                return refusal
+        if self.budget is not None and v.costs:
+            return self.budget.affordable(v.costs)
+        return None
 
     def _refuse(
         self, decider: Decider, req: Request, v: Verdict, reason: str,
@@ -228,7 +239,7 @@ class Ladder:
                              intent_id=v.intent.id)
                 return None
             return self._expand(decider, req, v, v.intent, checks)
-        if self.legality is None:
+        if self.legality is None and self.budget is None:
             return v
         refusal = self._check(req, v)
         if refusal is not None:
@@ -249,6 +260,12 @@ class Ladder:
                          intent_id=intent.id)
             return None
         failure: str | None = None
+        # the costs are the answer's, not the plan's: if it can't be paid for, don't plan it
+        if self.budget is not None and v.costs:
+            over = self.budget.affordable(v.costs)
+            if over is not None:
+                self._refuse(decider, req, v, over, checks, intent_id=intent.id)
+                return None
         for attempt in (1, 2):
             tag = {"rung": decider.rung, "choice": v.choice, "intent_id": intent.id,
                    "attempt": attempt}
@@ -366,6 +383,23 @@ class Ladder:
                     reason="no decider answered; the game's own AI keeps it",
                 )
 
+        charge_failed = False
+        if self.budget is not None and final_verdict.costs and final_verdict.choice:
+            # Charge only the answer that stands. Atomic, so threads sharing a budget can't both
+            # spend the last of it. The loser falls back to the game's own AI, deliberately:
+            # its answer was judged with gold that is no longer there.
+            refusal = self.budget.reserve(final_verdict.costs)
+            charge_failed = refusal is not None
+            if refusal is None:
+                checks.append({"rung": final_verdict.rung, "choice": final_verdict.choice,
+                               "budget": "reserved", "costs": dict(final_verdict.costs)})
+            else:
+                checks.append({"rung": final_verdict.rung, "choice": final_verdict.choice,
+                               "legal": False, "reason": refusal})
+                final_verdict = Verdict(
+                    choice="", rung=0, reason="no affordable answer; the game's own AI keeps it"
+                )
+
         if errors:
             failed = "; ".join(f"rung {e['rung']} failed ({e['error']})" for e in errors)
             final_verdict = final_verdict.model_copy(
@@ -373,7 +407,7 @@ class Ladder:
             )
 
         # per-attempt entries of an intent stay in legality; the final refusal speaks for them
-        refused = [c for c in checks if not c["legal"] and "attempt" not in c]
+        refused = [c for c in checks if not c.get("legal", True) and "attempt" not in c]
         if refused:
             text = "; ".join(f"rung {c['rung']} illegal ({c['reason']})" for c in refused)
             final_verdict = final_verdict.model_copy(
@@ -386,7 +420,8 @@ class Ladder:
 
         if self.log is not None:
             try:
-                final_verdict = self._record(req, final_verdict, cheap_verdict, gate_reason, errors)
+                final_verdict = self._record(req, final_verdict, cheap_verdict, gate_reason, errors,
+                                             charge_failed)
             except Exception as exc:
                 # Losing one log row is recoverable; losing the turn is not.
                 self.log_failures += 1
@@ -407,11 +442,14 @@ class Ladder:
         cheap_verdict: Verdict | None,
         gate_reason: str,
         errors: list[dict[str, Any]],
+        charge_failed: bool = False,
     ) -> Verdict:
         """Write the decision to the log and return the verdict with its decision_id."""
         assert self.log is not None
         # On an escalation, keep the cheap answer too, so agreement can be measured later.
-        keep_cheap = bool(gate_reason) and cheap_verdict is not None
+        # (also when the budget couldn't pay for the answer that stood: the row says choice "",
+        # and replay must still know what the cheap rung said)
+        keep_cheap = (bool(gate_reason) or charge_failed) and cheap_verdict is not None
         decision = Decision(
             cheap_choice=cheap_verdict.choice if keep_cheap and cheap_verdict else None,
             cheap_rung=cheap_verdict.rung if keep_cheap and cheap_verdict else None,
@@ -423,7 +461,7 @@ class Ladder:
             # scores that match the logged choice: the final rung's, else the cheap rung's
             options=normalise(
                 final_verdict.options
-                or (cheap_verdict.options if cheap_verdict is not None else [])
+                or (cheap_verdict.options if cheap_verdict is not None and not charge_failed else [])
                 or req.options
             ),
             rung=final_verdict.rung,
