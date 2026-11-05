@@ -163,6 +163,11 @@ connection doesn't stop the turn; the cheap answer stands. To treat a slow decid
 pass `decider_timeout=` (in seconds) to `Ladder`. Each failure is listed in
 `verdict.decider_errors` and in the log row, and logged as a warning on the `jigsaw` logger.
 
+A failed log write (a full disk, a locked file) doesn't lose the decision either. The verdict
+comes back with `decision_id=None` and `log_error` set, and `ladder.log_failures` counts them.
+Watch that counter if the log matters to you: a log that fails every write still lets the game
+run, so nothing else would tell you the data stopped.
+
 ## Status
 
 Alpha, version 0.1.0. The API may change before 1.0.
@@ -171,8 +176,8 @@ Alpha, version 0.1.0. The API may change before 1.0.
   War*, uses them.
 - **Designed, not built:** a gate that learns from the log, genre templates, and *distillation*
   (turning repeated model answers into rules). See `docs/specs/2026-10-26-jigsaw-design.md`.
-- **Known gaps:** listed and ranked in `STANDARDS.md`. The first one: if writing a log row
-  fails, the error escapes `Ladder.decide` and the verdict is lost with it.
+- **Known gaps:** listed and ranked in `STANDARDS.md`. The first one: no CI yet, so tests run
+  only when someone runs them.
 - **Out of scope:** real-time games, and calling model providers. Your deciders do that.
 
 ## Work on it

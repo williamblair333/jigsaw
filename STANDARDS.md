@@ -50,8 +50,8 @@ standards:
     area: data
     bar: A failed log write never discards the verdict; it is counted and surfaced to the caller, and a test simulates a failing write
     why: losing one log row is recoverable, losing the turn is not (Release It!, bulkheads)
-    status: open
-    evidence: an exception from DecisionLog.record propagates out of Ladder.decide
+    status: done
+    evidence: tests/test_log_write_failure.py
   - id: every-decision-logged
     area: learning loop
     bar: Every Ladder.decide call with a log writes exactly one row and returns its id
