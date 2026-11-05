@@ -14,6 +14,7 @@ from jigsaw.ladder import (
 )
 from jigsaw.replay import ReplayReport, ReplayRow, replay_gate, replay_ladder
 from jigsaw.report import ConcordanceRow, concordance
+from jigsaw.skip_lot import SkipLotGate
 from jigsaw.utility import Consideration, UtilityDecider, compensate, linear, logistic, power, step
 from jigsaw.world import Blackboard, Budget, PersonaExpander
 
@@ -42,6 +43,7 @@ __all__ = [
     "Option",
     "ReplayReport",
     "ReplayRow",
+    "SkipLotGate",
     "Request",
     "Verdict",
     "concordance",

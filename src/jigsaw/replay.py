@@ -112,6 +112,12 @@ def replay_gate(log: DecisionLog, gate: Gate, **filters: Any) -> ReplayReport:
     for d, req in _logged(log, filters, report):
         cheap = _cheap_verdict(d)
         reason = gate.check(req, cheap)
+        # A gate that learns from agreement hears the logged outcome, but only when it
+        # escalated itself: a decision it skips would give it no feedback in a live game.
+        observe = getattr(gate, "observe", None)
+        if (callable(observe) and reason and d.escalated_because and d.cheap_choice is not None
+                and d.cheap_rung is not None and d.rung > d.cheap_rung):
+            observe(d.kind, d.choice == d.cheap_choice)
         if not reason:
             choice, rung = (cheap.choice, cheap.rung) if cheap else ("", 0)
         elif d.escalated_because:
