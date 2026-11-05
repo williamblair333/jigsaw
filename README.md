@@ -191,6 +191,16 @@ Alpha, version 0.1.0. The API may change before 1.0.
   doesn't yet run the first-run check in a clean container before every tag.
 - **Out of scope:** real-time games, and calling model providers. Your deciders do that.
 
+## Versions and the public API
+
+The public API is the names in `jigsaw.__all__` (`ConcordanceRow`, `Decider`, `Decision`, `DecisionLog`, `Gate`, `GateConfig`, `Ladder`, `Legality`, `Option`, `ReplayReport`, `ReplayRow`, `Request`, `SCHEMA_VERSION`, `Verdict`, `concordance`, `normalise`, `replay_gate`, `replay_ladder`), plus the `jigsaw` command line. Anything else, including underscore names and module internals, can change in any release.
+
+Until 1.0, a minor release (0.x.0) may change the public API. A patch release (0.x.y) never does.
+
+A change that breaks the public API first ships one minor release in which the old form still works and raises a `DeprecationWarning` naming the replacement. The old form goes away in the next minor release.
+
+Every release bumps `version` in pyproject.toml, adds a CHANGELOG section, and is tagged `vX.Y.Z` on main after `just contract` passes.
+
 ## Work on it
 
 ```bash
