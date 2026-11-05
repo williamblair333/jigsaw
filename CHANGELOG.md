@@ -5,6 +5,19 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+- Each log row keeps the whole request in a new `request` column: stakes, human, context and
+  the raw option scores. This is schema version 3. Opening a v0.2.0 log adds the column; rows
+  logged before it have no request. Context values that can't be stored as JSON are kept as text.
+- `jigsaw.replay`: rerun logged decisions offline. `replay_gate(log, gate)` asks a candidate
+  gate whether it would escalate each row. It runs no deciders, because the cheap answer is
+  already in the log, so trying new thresholds costs nothing. `replay_ladder(log, ladder)` runs
+  a candidate ladder's deciders for real (model rungs make real calls). Neither writes to a log.
+- `jigsaw replay LOG --gate margin=0.2,cadence=0` or `--ladder module:factory`, with optional
+  `--game`, `--actor`, `--kind`, `--since-turn`. It prints how many rows escalated before and
+  now, and how many choices would change (STANDARDS `full-request-replayable`).
+- `Verdict.escalated_because`: the gate's reason, or `""` when it didn't escalate.
+
 ## [0.2.0] - 2026-11-05
 
 Logs from v0.1.0 upgrade themselves the first time v0.2.0 opens them. v0.1.0 can still read
