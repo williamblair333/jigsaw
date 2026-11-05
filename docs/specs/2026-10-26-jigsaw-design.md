@@ -169,7 +169,7 @@ Each intent has an `intent_id`. When an expanded primitive action fails or is re
 2. The planner attempts to retry or replan alternative primitives once.
 3. If replanning fails again, it escalates up the ladder with the failure reason and execution trace.
 
-**Built (2026-11-05):** Goal intents and the replan-once protocol are built (`jigsaw.intent`, `Ladder(expanders=...)`). Persona-weight intents and escalation with an execution trace are not built yet.
+**Built (2026-11-05):** Goal intents, the replan-once protocol and escalation with the trace (`Request.trace`) are built (`jigsaw.intent`, `Ladder(expanders=...)`). Only persona-weight intents are not built yet.
 
 ### 6. Decision log (engine): built first
 One record per decision: game, turn, faction, decision kind, situation summary, options with scores,
