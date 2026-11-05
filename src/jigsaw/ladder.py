@@ -421,7 +421,11 @@ class Ladder:
 
         holding_note = ""
         if final_verdict.holding is not None:
-            if final_verdict.holding.choose != final_verdict.choice:
+            if final_verdict.rung < self.gate.config.escalate_rung:
+                # a cheap rule's holding would only distill the rule back into itself
+                holding_note = "holding dropped: only model rungs record holdings"
+                final_verdict = final_verdict.model_copy(update={"holding": None})
+            elif final_verdict.holding.choose != final_verdict.choice:
                 holding_note = (f"holding dropped: holding chooses {final_verdict.holding.choose!r} "
                                 f"but the answer is {final_verdict.choice!r}")
                 final_verdict = final_verdict.model_copy(update={"holding": None})
@@ -429,8 +433,12 @@ class Ladder:
                 final_verdict = final_verdict.model_copy(update={
                     "holding": final_verdict.holding.model_copy(update={"kind": req.kind})})
 
+        # Shadow only a quiet decision whose cheap answer stands (not one the budget refused).
+        # The shadow answer skips the legality check, so it may name an illegal move: it is
+        # an audit, never sent.
         if (self.shadow_rate > 0.0 and not gate_reason and cheap_verdict is not None
-                and higher_deciders and self._shadow_rng.random() < self.shadow_rate):
+                and final_verdict.choice and higher_deciders
+                and self._shadow_rng.random() < self.shadow_rate):
             for decider in higher_deciders:
                 # a shadow failure is only logged by _call: it never touches this decision
                 shadow = self._call(decider, req, [])

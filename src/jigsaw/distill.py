@@ -13,6 +13,7 @@ before trusting it.
 """
 
 from collections.abc import Iterable
+import logging
 
 from pydantic import BaseModel
 
@@ -22,15 +23,25 @@ from jigsaw.ladder import Request, Verdict
 
 __all__ = ["Holding", "HoldingEval", "HoldingsDecider", "evaluate_holdings", "holdings"]
 
+_log = logging.getLogger("jigsaw")
+
 
 def holdings(log: DecisionLog, game: str | None = None, kind: str | None = None) -> list[Holding]:
-    """Every logged holding, oldest first, with its kind and source row id."""
+    """Every valid logged holding, oldest first, with its game, kind and source row id.
+
+    A malformed holding (from a log written before holdings were validated) is skipped and
+    logged as a warning, so one bad row can't stop the rest from being read.
+    """
     found: list[Holding] = []
     for d in reversed(log.query(game=game, kind=kind)):
         if d.holding is None:
             continue
-        h = Holding.model_validate(d.holding)
-        found.append(h.model_copy(update={"kind": d.kind, "source_id": d.id}))
+        try:
+            h = Holding.model_validate(d.holding)
+        except ValueError as exc:
+            _log.warning("decision #%s: malformed holding skipped: %s", d.id, exc)
+            continue
+        found.append(h.model_copy(update={"game": d.game, "kind": d.kind, "source_id": d.id}))
     return found
 
 
@@ -48,7 +59,7 @@ class HoldingsDecider:
     def decide(self, req: Request) -> Verdict | None:
         names = {o.name for o in req.options}
         for h in self.rules:
-            if h.kind and h.kind != req.kind:
+            if (h.kind and h.kind != req.kind) or (h.game and h.game != req.game):
                 continue
             if names and h.choose not in names:
                 continue
@@ -69,15 +80,20 @@ class HoldingEval(BaseModel):
 
 
 def evaluate_holdings(log: DecisionLog, game: str | None = None) -> list[HoldingEval]:
-    """Each logged holding against every logged decision of its kind that stored its request."""
-    rows = [d for d in log.query(game=game) if d.request is not None]
+    """Each logged holding against every other logged decision of its game and kind.
+
+    The holding's own source row is left out: it agrees by construction. Rows a deployed
+    HoldingsDecider answered also agree by construction; evaluate on a log from before the
+    rule ran, or the agreement rate flatters the rule.
+    """
+    rows = [(d, Request.model_validate(d.request)) for d in log.query(game=game)
+            if d.request is not None]
     results: list[HoldingEval] = []
     for h in holdings(log, game=game):
         matched = agreed = 0
-        for d in rows:
-            if d.kind != h.kind:
+        for d, req in rows:
+            if d.id == h.source_id or d.kind != h.kind or d.game != h.game:
                 continue
-            req = Request.model_validate(d.request)
             if h.matches(req.context):
                 matched += 1
                 agreed += d.choice == h.choose

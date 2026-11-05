@@ -11,6 +11,16 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   resets to always on any disagreement. `jigsaw replay --skip-lot`
   replays a log through the gate to measure saved calls and changed choices (STANDARDS idea
   `skip-lot-gate`; its test needs a campaign logged with v0.5.0 or later).
+- `Ladder(shadow_rate=, shadow_rng=)` puts a sample of quiet decisions to higher rungs without
+  acting on the answer, logging `shadow_choice` and `shadow_rung` (STANDARDS idea
+  `shadow-audit-sample`). `jigsaw concordance` adds `shadowed` and `shadow_agreement` columns to
+  compare quiet agreement against escalated agreement.
+- `Verdict.holding` lets a model attach a rule of thumb for distillation (STANDARDS idea
+  `holdings-for-distillation`). `jigsaw.distill` adds `holdings` to read them from the log,
+  `evaluate_holdings` to score their coverage and agreement, `HoldingsDecider` to run them as a
+  rung-1 rule, and `jigsaw holdings` to inspect them from the CLI.
+- The decision log moves to schema 5 (`shadow_choice`, `shadow_rung`, `holding`). Releases
+  v0.5.0 through v0.8.0 refuse a schema-5 log.
 
 ## [0.8.0] - 2026-11-05
 

@@ -42,7 +42,7 @@ def concordance(log: DecisionLog, game: str | None = None) -> list[ConcordanceRo
     for d in log.query(game=game):
         c = counts[(d.game, d.kind)]
         c[0] += 1
-        if d.shadow_choice is not None:
+        if d.shadow_choice is not None and d.choice:
             c[4] += 1
             c[5] += d.shadow_choice == d.choice
         if not d.escalated_because:

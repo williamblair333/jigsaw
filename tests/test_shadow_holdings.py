@@ -154,8 +154,8 @@ def test_holdings_decider_applies_matching_holdings_at_rung_1() -> None:
 
 
 def test_holding_whose_choice_is_not_an_option_passes() -> None:
-    d = HoldingsDecider([Holding(kind="recruit", when={}, choose="knights")])
-    assert d.decide(_quiet(1)) is None
+    d = HoldingsDecider([Holding(kind="recruit", when={"treasury": {"max": 500}}, choose="knights")])
+    assert d.decide(_quiet(1, treasury=200)) is None
 
 
 def test_holdings_are_read_from_the_log_with_provenance(tmp_path: Path) -> None:
@@ -174,17 +174,103 @@ def test_evaluate_holdings_counts_matches_and_agreement(tmp_path: Path) -> None:
     Ladder([Cheap(), Model("spears")], Gate(), log).decide(_escalated(4, treasury=100))  # agrees
 
     (ev,) = evaluate_holdings(log)
-    assert (ev.matched, ev.agreed) == (3, 2)          # turns 1, 2, 4 match; 1 and 4 agree
-    assert ev.agreement == pytest.approx(2 / 3)
+    # turn 1 is the holding's own source, so it doesn't count; turns 2 and 4 match; 4 agrees
+    assert (ev.matched, ev.agreed) == (2, 1)
+    assert ev.agreement == pytest.approx(0.5)
 
 
 def test_cli_holdings(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     log = DecisionLog(tmp_path / "d.db")
     Ladder([Cheap(), Model("spears", POOR)], Gate(), log).decide(_escalated(1, treasury=200))
+    Ladder([Cheap(), Model("spears")], Gate(), log).decide(_escalated(2, treasury=300))
     log.close()
     assert main(["holdings", str(tmp_path / "d.db")]) == 0
     out = capsys.readouterr().out
     assert "recruit" in out and "spears" in out and "100%" in out
+
+
+def test_evaluation_skips_the_source_row(tmp_path: Path) -> None:
+    log = DecisionLog(tmp_path / "d.db")
+    Ladder([Cheap(), Model("spears", POOR)], Gate(), log).decide(_escalated(1, treasury=200))
+    (ev,) = evaluate_holdings(log)
+    assert (ev.matched, ev.agreed) == (0, 0) and ev.agreement is None
+
+
+def test_evaluation_stays_in_the_holdings_game(tmp_path: Path) -> None:
+    log = DecisionLog(tmp_path / "d.db")
+    Ladder([Cheap(), Model("spears", POOR)], Gate(), log).decide(_escalated(1, treasury=200))
+    other = _escalated(2, treasury=100).model_copy(update={"game": "h"})
+    Ladder([Cheap(), Model("spears")], Gate(), log).decide(other)
+    (ev,) = evaluate_holdings(log)
+    assert ev.holding.game == "g" and ev.matched == 0
+
+
+@pytest.mark.parametrize("when", [
+    {},                                   # matches everything
+    {"treasury": {"mn": 5}},              # typo: a wildcard
+    {"treasury": {"min": "abc"}},         # crashes every reader
+    {"treasury": {"min": float("nan")}},
+    {"treasury": {}},
+    {"treasury": float("nan")},
+    {"treasury": [1, {"x": 2}]},
+])
+def test_malformed_holdings_are_refused(when: dict[str, Any]) -> None:
+    with pytest.raises(ValueError):
+        Holding(when=when, choose="spears")
+
+
+def test_model_with_a_malformed_holding_counts_as_a_failed_decider() -> None:
+    v = Ladder([Cheap(), Model("spears", {"when": {}, "choose": "spears"})], Gate()).decide(
+        _escalated(1, treasury=200))
+    assert v.rung == 2 and v.decider_errors and v.holding is None
+
+
+def test_nan_and_bool_context_values_do_not_match() -> None:
+    rng = Holding(when={"treasury": {"max": 500}}, choose="spears")
+    assert not rng.matches({"treasury": float("nan")})
+    assert not rng.matches({"treasury": True})
+    flag = Holding(when={"at_war": True}, choose="spears")
+    assert not flag.matches({"at_war": 1})
+    assert not Holding(when={"n": 1}, choose="x").matches({"n": True})
+
+
+def test_reader_skips_a_malformed_holding_in_an_old_log(tmp_path: Path) -> None:
+    from jigsaw.decision_log import Decision
+
+    log = DecisionLog(tmp_path / "d.db")
+    log.record(Decision(game="g", turn=1, actor="a", kind="recruit", situation="s", rung=7,
+                        choice="spears", holding={"when": {"t": {"min": "abc"}}, "choose": "spears"}))
+    assert holdings(log) == [] and evaluate_holdings(log) == []
+
+
+def test_cheap_rung_holdings_are_dropped() -> None:
+    class CheapWithHolding:
+        rung = 2
+
+        def decide(self, req: Request) -> Verdict | None:
+            return Verdict(choice="spears", rung=2, reason="rule", holding=POOR)
+
+    v = Ladder([CheapWithHolding()], Gate(QUIET)).decide(_quiet(1, treasury=200))
+    assert v.holding is None and "only model rungs record holdings" in v.reason
+
+
+def test_no_shadow_after_a_budget_refusal(tmp_path: Path) -> None:
+    from jigsaw.world import Budget
+
+    class Costly:
+        rung = 2
+
+        def decide(self, req: Request) -> Verdict | None:
+            return Verdict(choice="spears", rung=2, reason="rule", costs={"gold": 10})
+
+    class RacedBudget(Budget):
+        def reserve(self, costs):  # type: ignore[override]
+            return "over budget: gold needs 10, 0 left"
+
+    model = Model()
+    v = Ladder([Costly(), model], Gate(QUIET), budget=RacedBudget({"gold": 100}), shadow_rate=1.0,
+               shadow_rng=random.Random(0)).decide(_quiet(1))
+    assert v.choice == "" and v.shadow_choice is None and model.calls == 0
 
 
 # ---------------------------------------------------------------------------
