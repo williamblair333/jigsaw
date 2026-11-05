@@ -2,12 +2,13 @@
 
 from collections.abc import Callable, Mapping, Sequence
 import logging
+import random
 import threading
 from typing import Any, Protocol, runtime_checkable
 from pydantic import BaseModel, Field
 
 from jigsaw.decision_log import Decision, DecisionLog, Option
-from jigsaw.intent import Expander, Intent
+from jigsaw.intent import Expander, Holding, Intent
 from jigsaw.world import Budget
 
 _log = logging.getLogger("jigsaw")
@@ -58,6 +59,12 @@ class Verdict(BaseModel):
     options: list[Option] = Field(default_factory=list[Option])
     # what carrying out this answer uses up, per resource; a Ladder with a budget charges it
     costs: dict[str, float] = Field(default_factory=dict[str, float])
+    # a model rung's rule of thumb for this answer, kept for distillation (jigsaw.distill);
+    # the ladder drops it if it doesn't choose this verdict's own answer
+    holding: Holding | None = None
+    # a shadow audit of a quiet decision: what a higher rung would have said (not acted on)
+    shadow_choice: str | None = None
+    shadow_rung: int | None = None
 
 
 # A pack's legality check: return None when the verdict can be sent, or the reason it can't.
@@ -172,7 +179,15 @@ class Ladder:
         legality: Legality | None = None,
         expanders: Mapping[str, Expander] | None = None,
         budget: Budget | None = None,
+        shadow_rate: float = 0.0,
+        shadow_rng: random.Random | None = None,
     ) -> None:
+        if not 0.0 <= shadow_rate <= 1.0:
+            raise ValueError(f"shadow_rate must be in 0..1, got {shadow_rate}")
+        # share of quiet decisions also put to the higher rungs, logged and not acted on
+        # (STANDARDS idea shadow-audit-sample); each one is a real, possibly paid, call
+        self.shadow_rate = shadow_rate
+        self._shadow_rng = shadow_rng if shadow_rng is not None else random.Random()
         self.deciders = list(deciders)
         self.gate = gate
         self.log = log
@@ -404,6 +419,26 @@ class Ladder:
                     choice="", rung=0, reason="no affordable answer; the game's own AI keeps it"
                 )
 
+        holding_note = ""
+        if final_verdict.holding is not None:
+            if final_verdict.holding.choose != final_verdict.choice:
+                holding_note = (f"holding dropped: holding chooses {final_verdict.holding.choose!r} "
+                                f"but the answer is {final_verdict.choice!r}")
+                final_verdict = final_verdict.model_copy(update={"holding": None})
+            else:
+                final_verdict = final_verdict.model_copy(update={
+                    "holding": final_verdict.holding.model_copy(update={"kind": req.kind})})
+
+        if (self.shadow_rate > 0.0 and not gate_reason and cheap_verdict is not None
+                and higher_deciders and self._shadow_rng.random() < self.shadow_rate):
+            for decider in higher_deciders:
+                # a shadow failure is only logged by _call: it never touches this decision
+                shadow = self._call(decider, req, [])
+                if shadow is not None:
+                    final_verdict = final_verdict.model_copy(
+                        update={"shadow_choice": shadow.choice, "shadow_rung": shadow.rung})
+                    break
+
         # An expander may have a commit(req, intent) step, run once for the answer that stands,
         # after every check (PersonaExpander writes its weights here, not while planning).
         if final_verdict.intent is not None and self.expanders is not None and final_verdict.choice:
@@ -431,6 +466,10 @@ class Ladder:
             final_verdict = final_verdict.model_copy(
                 update={"reason": f"{final_verdict.reason}; {text}"}
             )
+
+        if holding_note:
+            final_verdict = final_verdict.model_copy(
+                update={"reason": f"{final_verdict.reason}; {holding_note}"})
 
         final_verdict = final_verdict.model_copy(
             update={"escalated_because": gate_reason, "legality": checks}
@@ -490,5 +529,9 @@ class Ladder:
             decider_errors=errors,
             request=req.model_dump(),
             intent=final_verdict.intent.model_dump() if final_verdict.intent else None,
+            shadow_choice=final_verdict.shadow_choice,
+            shadow_rung=final_verdict.shadow_rung,
+            holding=(final_verdict.holding.model_dump(include={"when", "choose"})
+                     if final_verdict.holding else None),
         )
         return final_verdict.model_copy(update={"decision_id": self.log.record(decision)})

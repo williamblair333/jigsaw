@@ -201,9 +201,11 @@ def test_schema_4_adds_the_intent_column_to_a_v3_file(tmp_path: Path) -> None:
     DecisionLog(path).close()
     with sqlite3.connect(path) as conn:
         conn.execute("ALTER TABLE decisions DROP COLUMN intent")
+        for col in ("shadow_choice", "shadow_rung", "holding"):     # added in schema 5
+            conn.execute(f"ALTER TABLE decisions DROP COLUMN {col}")
         conn.execute("PRAGMA user_version = 3")
     DecisionLog(path).close()
     with sqlite3.connect(path) as conn:
         cols = [r[1] for r in conn.execute("PRAGMA table_info(decisions)")]
         assert "intent" in cols
-        assert conn.execute("PRAGMA user_version").fetchone()[0] == SCHEMA_VERSION == 4
+        assert conn.execute("PRAGMA user_version").fetchone()[0] == SCHEMA_VERSION

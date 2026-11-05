@@ -6,7 +6,7 @@ the intent into primitives. The legality check then runs on the expanded plan. I
 fails, the expander gets one more try with the failure reason.
 """
 
-from typing import Any, Protocol, runtime_checkable
+from typing import Any, Protocol, cast, runtime_checkable
 from uuid import uuid4
 
 from pydantic import BaseModel, Field
@@ -23,6 +23,41 @@ class Intent(BaseModel):
     verb: str
     args: dict[str, Any] = Field(default_factory=dict[str, Any])
     note: str = ""
+
+
+class Holding(BaseModel):
+    """A model rung's holding (STANDARDS idea holdings-for-distillation): "when these hold,
+    choose this". Distillation turns logged holdings into rung-1 rules (jigsaw.distill).
+
+    `when` maps a request.context key to a condition: a plain value must be equal, a list
+    means one of, and {"min": a, "max": b} is a numeric range (either end may be left out).
+    """
+
+    when: dict[str, Any] = Field(default_factory=dict[str, Any])
+    choose: str
+    kind: str = ""
+    # the decision log row the holding came from, when read back from a log
+    source_id: int | None = None
+
+    def matches(self, context: dict[str, Any]) -> bool:
+        for key, cond in self.when.items():
+            if key not in context:
+                return False
+            value = context[key]
+            if isinstance(cond, dict):
+                bounds = cast(dict[str, Any], cond)
+                if isinstance(value, bool) or not isinstance(value, (int, float)):
+                    return False
+                if "min" in bounds and value < bounds["min"]:
+                    return False
+                if "max" in bounds and value > bounds["max"]:
+                    return False
+            elif isinstance(cond, list):
+                if value not in cast(list[Any], cond):
+                    return False
+            elif value != cond:
+                return False
+        return True
 
 
 @runtime_checkable

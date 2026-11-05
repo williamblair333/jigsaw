@@ -22,18 +22,29 @@ class ConcordanceRow(BaseModel):
     escalated: int
     compared: int
     agreed: int
+    # shadow audits of quiet decisions (STANDARDS idea shadow-audit-sample)
+    shadowed: int = 0
+    shadow_agreed: int = 0
 
     @property
     def agreement(self) -> float | None:
         """agreed / compared, or None when nothing could be compared."""
         return self.agreed / self.compared if self.compared else None
 
+    @property
+    def shadow_agreement(self) -> float | None:
+        """How often the higher rung agreed on quiet decisions it was asked about in shadow."""
+        return self.shadow_agreed / self.shadowed if self.shadowed else None
+
 
 def concordance(log: DecisionLog, game: str | None = None) -> list[ConcordanceRow]:
-    counts: dict[tuple[str, str], list[int]] = defaultdict(lambda: [0, 0, 0, 0])
+    counts: dict[tuple[str, str], list[int]] = defaultdict(lambda: [0, 0, 0, 0, 0, 0])
     for d in log.query(game=game):
         c = counts[(d.game, d.kind)]
         c[0] += 1
+        if d.shadow_choice is not None:
+            c[4] += 1
+            c[5] += d.shadow_choice == d.choice
         if not d.escalated_because:
             continue
         c[1] += 1
@@ -41,8 +52,9 @@ def concordance(log: DecisionLog, game: str | None = None) -> list[ConcordanceRo
             c[2] += 1
             c[3] += d.choice == d.cheap_choice
     return [
-        ConcordanceRow(game=g, kind=k, decisions=n, escalated=e, compared=cmp, agreed=a)
-        for (g, k), (n, e, cmp, a) in sorted(counts.items())
+        ConcordanceRow(game=g, kind=k, decisions=n, escalated=e, compared=cmp, agreed=a,
+                       shadowed=s, shadow_agreed=sa)
+        for (g, k), (n, e, cmp, a, s, sa) in sorted(counts.items())
     ]
 
 
@@ -53,6 +65,11 @@ def concordance_table(rows: list[ConcordanceRow]) -> str:
          "-" if r.agreement is None else f"{r.agreement:.0%}"]
         for r in rows
     ]
+    if any(r.shadowed for r in rows):   # shadow columns only for logs that have shadow audits
+        header += ["shadowed", "shadow_agreement"]
+        for r, line in zip(rows, body):
+            line += [str(r.shadowed),
+                     "-" if r.shadow_agreement is None else f"{r.shadow_agreement:.0%}"]
     widths = [max(len(row[i]) for row in [header, *body]) for i in range(len(header))]
     return "\n".join("  ".join(cell.ljust(w) for cell, w in zip(row, widths)).rstrip()
                      for row in [header, *body])
