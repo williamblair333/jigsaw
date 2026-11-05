@@ -174,6 +174,14 @@ answer. A refused answer counts as passing, so a model that names a unit you don
 to the cheap rung's legal answer. If the check itself crashes, the answer is refused too: an
 unverified move is never returned.
 
+A model rung can answer with `Verdict(intent=Intent(verb="take", args={"target": "Milan"}))`.
+`Ladder(expanders={"take": ...})` gives the pack's expander for each verb, whose
+`expand(request, intent, failure)` returns primitives or None. The legality check runs on the
+expanded plan. If the plan fails, the expander gets one more try with the reason in `failure`,
+and if that fails too the answer passes up. Once `expanders` is set, a model rung (rung 5 and
+up) that returns primitives instead of an intent is refused, so a model never emits raw game ids.
+The intent is logged in a new `intent` column (schema 4).
+
 A failed log write (a full disk, a locked file) doesn't lose the decision either. The verdict
 comes back with `decision_id=None` and `log_error` set, and `ladder.log_failures` counts them.
 Watch that counter if the log matters to you: a log that fails every write still lets the game

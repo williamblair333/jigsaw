@@ -104,8 +104,8 @@ standards:
     area: game AI
     bar: Model rungs return a structured intent that deterministic rungs expand into primitives; a model never emits raw game ids
     why: models are good at goals and bad at transient ids (Game AI Pro, HTN)
-    status: open
-    evidence: spec piece 5; not built
+    status: done
+    evidence: tests/test_intent.py
   - id: concurrent-readers
     area: data
     bar: The log opens in WAL mode so an analysis read during a campaign never blocks a decision write

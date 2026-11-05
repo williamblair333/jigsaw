@@ -1,12 +1,13 @@
 """Decision ladder and gate for Jigsaw game AI."""
 
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 import logging
 import threading
 from typing import Any, Protocol, runtime_checkable
 from pydantic import BaseModel, Field
 
 from jigsaw.decision_log import Decision, DecisionLog, Option
+from jigsaw.intent import Expander, Intent
 
 _log = logging.getLogger("jigsaw")
 
@@ -44,6 +45,8 @@ class Verdict(BaseModel):
     # the pack's legality check on each answer, in order:
     # {"rung", "choice", "legal": bool, "reason" when refused}; set by Ladder.decide
     legality: list[dict[str, Any]] = Field(default_factory=list[dict[str, Any]])
+    # a model rung's goal, expanded into primitives by the pack's expander for its verb
+    intent: Intent | None = None
 
 
 # A pack's legality check: return None when the verdict can be sent, or the reason it can't.
@@ -155,14 +158,37 @@ class Ladder:
         log: DecisionLog | None = None,
         decider_timeout: float | None = None,
         legality: Legality | None = None,
+        expanders: Mapping[str, Expander] | None = None,
     ) -> None:
         self.deciders = list(deciders)
         self.gate = gate
         self.log = log
         self.decider_timeout = decider_timeout
         self.legality = legality
+        # verb -> the pack's expander. When set, model rungs must answer with an intent.
+        self.expanders = dict(expanders) if expanders is not None else None
         # log writes that failed; each such verdict was still returned, with log_error set
         self.log_failures = 0
+
+    def _check(self, req: Request, v: Verdict) -> str | None:
+        """The legality check's refusal, or None when the verdict may be sent."""
+        if self.legality is None:
+            return None
+        try:
+            return self.legality(req, v)
+        except Exception as exc:
+            return f"legality check raised {type(exc).__name__}: {exc}"
+
+    def _refuse(
+        self, decider: Decider, req: Request, v: Verdict, reason: str,
+        checks: list[dict[str, Any]], **extra: Any,
+    ) -> None:
+        checks.append({"rung": decider.rung, "choice": v.choice, "legal": False,
+                       "reason": reason, **extra})
+        _log.warning(
+            "rung %d answer %r refused on %s/%s turn %d: %s",
+            decider.rung, v.choice, req.game, req.kind, req.turn, reason,
+        )
 
     def _ask(
         self,
@@ -171,24 +197,75 @@ class Ladder:
         errors: list[dict[str, Any]],
         checks: list[dict[str, Any]],
     ) -> Verdict | None:
-        """Ask one decider, then run the legality check on its answer. Refused means None."""
+        """Ask one decider, expand its intent if it has one, and run the legality check.
+
+        Anything refused returns None, so the ladder moves on as if the decider had passed.
+        """
         v = self._call(decider, req, errors)
-        if v is None or self.legality is None:
+        if v is None:
+            return None
+        if self.expanders is not None and decider.rung >= self.gate.config.escalate_rung:
+            if v.primitives:
+                self._refuse(decider, req, v, "model rungs answer with an intent, not primitives",
+                             checks)
+                return None
+            if v.intent is None:
+                self._refuse(decider, req, v,
+                             "model rungs answer with an intent; this answer had none", checks)
+                return None
+        if v.intent is not None:
+            if self.expanders is None:
+                self._refuse(decider, req, v,
+                             "an intent needs an expander, and none are configured", checks,
+                             intent_id=v.intent.id)
+                return None
+            return self._expand(decider, req, v, v.intent, checks)
+        if self.legality is None:
             return v
-        try:
-            refusal = self.legality(req, v)
-        except Exception as exc:
-            refusal = f"legality check raised {type(exc).__name__}: {exc}"
-        entry: dict[str, Any] = {"rung": decider.rung, "choice": v.choice, "legal": refusal is None}
-        if refusal is None:
-            checks.append(entry)
-            return v
-        entry["reason"] = refusal
-        checks.append(entry)
-        _log.warning(
-            "rung %d answer %r refused by the legality check on %s/%s turn %d: %s",
-            decider.rung, v.choice, req.game, req.kind, req.turn, refusal,
-        )
+        refusal = self._check(req, v)
+        if refusal is not None:
+            self._refuse(decider, req, v, refusal, checks)
+            return None
+        checks.append({"rung": decider.rung, "choice": v.choice, "legal": True})
+        return v
+
+    def _expand(
+        self, decider: Decider, req: Request, v: Verdict, intent: Intent,
+        checks: list[dict[str, Any]],
+    ) -> Verdict | None:
+        """Plan the intent, check the plan, and replan once with the failure reason."""
+        assert self.expanders is not None
+        expander = self.expanders.get(intent.verb)
+        if expander is None:
+            self._refuse(decider, req, v, f"no expander for intent verb {intent.verb!r}", checks,
+                         intent_id=intent.id)
+            return None
+        failure: str | None = None
+        for attempt in (1, 2):
+            tag = {"rung": decider.rung, "choice": v.choice, "intent_id": intent.id,
+                   "attempt": attempt}
+            try:
+                primitives = expander.expand(req, intent, failure)
+            except Exception as exc:
+                primitives = None
+                failure = f"expander raised {type(exc).__name__}: {exc}"
+            else:
+                if primitives is None:
+                    failure = "the expander found no plan"
+                elif not primitives:
+                    primitives = None
+                    failure = "the expander returned an empty plan"
+            if primitives is not None:
+                planned = v.model_copy(update={"primitives": primitives})
+                refusal = self._check(req, planned)
+                if refusal is None:
+                    checks.append({**tag, "legal": True})
+                    return planned
+                failure = refusal
+            # every failed attempt is kept; only the final refusal goes into the reason text
+            checks.append({**tag, "legal": False, "reason": failure})
+        self._refuse(decider, req, v, f"intent {intent.verb} failed after replanning: {failure}",
+                     checks, intent_id=intent.id)
         return None
 
     def _call(self, decider: Decider, req: Request, errors: list[dict[str, Any]]) -> Verdict | None:
@@ -277,7 +354,8 @@ class Ladder:
                 update={"reason": f"{final_verdict.reason}; {failed}", "decider_errors": errors}
             )
 
-        refused = [c for c in checks if not c["legal"]]
+        # per-attempt entries of an intent stay in legality; the final refusal speaks for them
+        refused = [c for c in checks if not c["legal"] and "attempt" not in c]
         if refused:
             text = "; ".join(f"rung {c['rung']} illegal ({c['reason']})" for c in refused)
             final_verdict = final_verdict.model_copy(
@@ -332,5 +410,6 @@ class Ladder:
             legality=final_verdict.legality,
             decider_errors=errors,
             request=req.model_dump(),
+            intent=final_verdict.intent.model_dump() if final_verdict.intent else None,
         )
         return final_verdict.model_copy(update={"decision_id": self.log.record(decision)})

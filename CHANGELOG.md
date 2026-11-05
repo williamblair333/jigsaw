@@ -6,6 +6,13 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- Model rungs can answer with an `Intent`. `Ladder(expanders=...)` maps verbs to expanders, whose
+  `expand` returns primitives or None. Legality checks run on the expanded plan. On failure,
+  the expander replans once with the failure reason; if that fails too, the answer passes up.
+  When expanders are set, model rungs returning primitives are refused so models never emit raw
+  game ids. The intent is logged in an `intent` column (STANDARDS `intent-contract`).
+- The log moves to schema 4. v0.4.0 and earlier releases from v0.2.0 on refuse a schema-4 log,
+  and v0.1.0 has no version check.
 - CI job `first-run` runs PRODUCT.md's verify block in the clean image it names, on every PR
   and every push to `main`: `uv sync`, the quickstart, three expected output lines and the
   log file (`scripts/first-run.sh`). It's a required check, so every tag on `main` has passed

@@ -14,8 +14,9 @@ _log = logging.getLogger("jigsaw")
 # The log file's layout version, stored in SQLite's PRAGMA user_version.
 # 1: v0.1.0's table. Those files never set user_version, so they read as 0.
 # 2: adds cheap_choice, cheap_rung and decider_errors (v0.2.0).
-# 3: adds request, the whole Request as JSON, so rows can be replayed.
-SCHEMA_VERSION = 3
+# 3: adds request, the whole Request as JSON, so rows can be replayed (v0.3.0).
+# 4: adds intent, a model rung's goal, so outcomes can be traced to it.
+SCHEMA_VERSION = 4
 
 _CREATE_TABLE = """
 CREATE TABLE IF NOT EXISTS decisions (
@@ -37,7 +38,8 @@ CREATE TABLE IF NOT EXISTS decisions (
     cheap_choice TEXT,
     cheap_rung INTEGER,
     decider_errors TEXT NOT NULL DEFAULT '[]',
-    request TEXT
+    request TEXT,
+    intent TEXT
 )
 """
 
@@ -49,6 +51,7 @@ _MIGRATIONS: dict[int, list[str]] = {
         "ALTER TABLE decisions ADD COLUMN decider_errors TEXT NOT NULL DEFAULT '[]'",
     ],
     3: ["ALTER TABLE decisions ADD COLUMN request TEXT"],
+    4: ["ALTER TABLE decisions ADD COLUMN intent TEXT"],
 }
 
 
@@ -95,6 +98,8 @@ class Decision(BaseModel):
     # Request.model_dump() gives it. None for rows logged before schema 3. Values that can't
     # be stored as JSON are kept as their repr() text.
     request: dict[str, Any] | None = None
+    # The model rung's intent (id, verb, args) when the final verdict carried one; else None.
+    intent: dict[str, Any] | None = None
 
 
 class DecisionLog:
@@ -199,6 +204,7 @@ class DecisionLog:
             cheap_rung=row["cheap_rung"],
             decider_errors=json.loads(row["decider_errors"]),
             request=json.loads(row["request"]) if row["request"] is not None else None,
+            intent=json.loads(row["intent"]) if row["intent"] is not None else None,
         )
 
     def record(self, d: Decision) -> int:
@@ -214,8 +220,8 @@ class DecisionLog:
                     game, turn, actor, kind, situation, options, rung,
                     escalated_because, choice, primitives, legality,
                     outcome, outcome_turn, created_at, cheap_choice, cheap_rung,
-                    decider_errors, request
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    decider_errors, request, intent
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     d.game,
@@ -236,6 +242,7 @@ class DecisionLog:
                     d.cheap_rung,
                     json.dumps(d.decider_errors),
                     json.dumps(d.request, default=repr) if d.request is not None else None,
+                    json.dumps(d.intent, default=repr) if d.intent is not None else None,
                 ),
             )
             new_id = cursor.lastrowid
