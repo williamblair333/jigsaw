@@ -5,6 +5,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-11-05
+
+Logs from v0.1.0 upgrade themselves the first time v0.2.0 opens them. v0.1.0 can still read
+and write an upgraded log.
+
 ### Added
 - The log keeps both answers when a decision escalates. `Decision` and the `decisions` table
   gain `cheap_choice` and `cheap_rung`: what the cheap rung picked before the gate sent the
