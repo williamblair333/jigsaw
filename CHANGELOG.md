@@ -5,6 +5,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-11-05
+
+Logs move to schema 3 the first time v0.3.0 opens them. v0.2.0 refuses a schema-3 log, so
+after upgrading, don't move a pin back to v0.2.0. v0.1.0 has no version check.
+
 ### Added
 - Each log row keeps the whole request in a new `request` column: stakes, human, context and
   the raw option scores. This is schema version 3. Opening a v0.2.0 log adds the column; rows
@@ -17,6 +22,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `--game`, `--actor`, `--kind`, `--since-turn`. It prints how many rows escalated before and
   now, and how many choices would change (STANDARDS `full-request-replayable`).
 - `Verdict.escalated_because`: the gate's reason, or `""` when it didn't escalate.
+- `jigsaw concordance LOG [--game G]` (and `jigsaw.report.concordance`): per game and kind of
+  decision, how many decisions escalated, how many of those a higher rung answered after a
+  cheap rung had answered ("compared"), and how often the two agreed (STANDARDS
+  `gate-concordance-report`).
 
 ## [0.2.0] - 2026-11-05
 
