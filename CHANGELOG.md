@@ -6,6 +6,15 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- The log keeps both answers when a decision escalates. `Decision` and the `decisions` table
+  gain `cheap_choice` and `cheap_rung`: what the cheap rung picked before the gate sent the
+  decision up. They stay empty when nothing escalated or no cheap rung answered. Comparing them
+  with `choice` and `rung` gives the cheap-vs-model agreement rate (STANDARDS `log-both-verdicts`).
+- The log file has a schema version (`SCHEMA_VERSION = 2`, kept in SQLite's `PRAGMA user_version`).
+  Opening a v0.1.0 log adds the two new columns and keeps every row. A file from a newer Jigsaw is
+  refused with a clear error. A file that is already current opens without a write lock, so a
+  read-only copy can be queried (STANDARDS `schema-versioned`).
+
 - `PRODUCT.md`: core job, users, success measures, first-run path, non-goals, UI principles and
   a `verify:` block. The first-run gate passes in a clean `python:3.12-slim` container.
 - `STANDARDS.md`: the expert bar, 19 items ranked by impact, plus 3 ideas to test. Top gap:

@@ -176,7 +176,11 @@ class Ladder:
                 )
 
         if self.log is not None:
+            # On an escalation, keep the cheap answer too, so agreement can be measured later.
+            keep_cheap = bool(gate_reason) and cheap_verdict is not None
             decision = Decision(
+                cheap_choice=cheap_verdict.choice if keep_cheap else None,
+                cheap_rung=cheap_verdict.rung if keep_cheap else None,
                 game=req.game,
                 turn=req.turn,
                 actor=req.actor,

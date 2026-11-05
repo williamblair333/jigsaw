@@ -9,6 +9,42 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 
+# The log file's layout version, stored in SQLite's PRAGMA user_version.
+# 1: v0.1.0's table. Those files never set user_version, so they read as 0.
+# 2: adds cheap_choice and cheap_rung.
+SCHEMA_VERSION = 2
+
+_CREATE_TABLE = """
+CREATE TABLE IF NOT EXISTS decisions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    game TEXT NOT NULL,
+    turn INTEGER NOT NULL,
+    actor TEXT NOT NULL,
+    kind TEXT NOT NULL,
+    situation TEXT NOT NULL,
+    options TEXT NOT NULL,
+    rung INTEGER NOT NULL,
+    escalated_because TEXT NOT NULL,
+    choice TEXT NOT NULL,
+    primitives TEXT NOT NULL,
+    legality TEXT NOT NULL,
+    outcome TEXT,
+    outcome_turn INTEGER,
+    created_at TEXT NOT NULL,
+    cheap_choice TEXT,
+    cheap_rung INTEGER
+)
+"""
+
+# Steps that move a file from version N-1 to N, keyed by N.
+_MIGRATIONS: dict[int, list[str]] = {
+    2: [
+        "ALTER TABLE decisions ADD COLUMN cheap_choice TEXT",
+        "ALTER TABLE decisions ADD COLUMN cheap_rung INTEGER",
+    ],
+}
+
+
 def _utc_now_iso() -> str:
     """Return the current UTC time as an ISO-8601 string."""
     return datetime.now(timezone.utc).isoformat()
@@ -40,6 +76,11 @@ class Decision(BaseModel):
     outcome: str | None = None
     outcome_turn: int | None = None
     created_at: str = Field(default_factory=_utc_now_iso)
+    # What the cheap rung chose when the gate escalated past it. None when the decision did
+    # not escalate, or when no cheap rung answered. Comparing these with choice and rung gives
+    # the agreement rate between cheap and strong rungs.
+    cheap_choice: str | None = None
+    cheap_rung: int | None = Field(default=None, ge=0, le=7)
 
 
 class DecisionLog:
@@ -59,33 +100,48 @@ class DecisionLog:
         self._conn.row_factory = sqlite3.Row
         self._init_db()
 
+    def _schema_version(self) -> int:
+        version = self._conn.execute("PRAGMA user_version").fetchone()[0]
+        if version > SCHEMA_VERSION:
+            raise RuntimeError(
+                f"decision log {self._path} is schema version {version}, newer than this "
+                f"Jigsaw supports ({SCHEMA_VERSION}); upgrade Jigsaw to open it"
+            )
+        return version
+
     def _init_db(self) -> None:
-        """Create the decisions table and indices if they do not exist."""
-        with self._conn:
-            self._conn.execute(
-                """
-                CREATE TABLE IF NOT EXISTS decisions (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    game TEXT NOT NULL,
-                    turn INTEGER NOT NULL,
-                    actor TEXT NOT NULL,
-                    kind TEXT NOT NULL,
-                    situation TEXT NOT NULL,
-                    options TEXT NOT NULL,
-                    rung INTEGER NOT NULL,
-                    escalated_because TEXT NOT NULL,
-                    choice TEXT NOT NULL,
-                    primitives TEXT NOT NULL,
-                    legality TEXT NOT NULL,
-                    outcome TEXT,
-                    outcome_turn INTEGER,
-                    created_at TEXT NOT NULL
+        """Create the table in a new file, or migrate an older file up to SCHEMA_VERSION.
+
+        A file that is already current is opened without taking a write lock, so read-only
+        copies open and a busy writer elsewhere does not block the open. Otherwise the work
+        runs in one write transaction (BEGIN IMMEDIATE): a second process opening the same
+        file waits, then sees the finished result instead of migrating it twice.
+        """
+        with self._lock:
+            if self._schema_version() == SCHEMA_VERSION:
+                return
+            self._conn.execute("BEGIN IMMEDIATE")
+            try:
+                version = self._schema_version()
+                has_table = self._conn.execute(
+                    "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'decisions'"
+                ).fetchone()
+                if not has_table:
+                    self._conn.execute(_CREATE_TABLE)
+                else:
+                    # A file with the table but no version number is version 1.
+                    for step in range(max(version, 1) + 1, SCHEMA_VERSION + 1):
+                        for sql in _MIGRATIONS[step]:
+                            self._conn.execute(sql)
+                self._conn.execute(
+                    "CREATE INDEX IF NOT EXISTS idx_decisions_query "
+                    "ON decisions(game, actor, kind, rung, turn)"
                 )
-                """
-            )
-            self._conn.execute(
-                "CREATE INDEX IF NOT EXISTS idx_decisions_query ON decisions(game, actor, kind, rung, turn)"
-            )
+                self._conn.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
+                self._conn.commit()
+            except BaseException:
+                self._conn.rollback()
+                raise
 
     def _row_to_decision(self, row: sqlite3.Row) -> Decision:
         """Convert a database row into a Decision model instance."""
@@ -107,6 +163,8 @@ class DecisionLog:
             outcome=row["outcome"],
             outcome_turn=row["outcome_turn"],
             created_at=row["created_at"],
+            cheap_choice=row["cheap_choice"],
+            cheap_rung=row["cheap_rung"],
         )
 
     def record(self, d: Decision) -> int:
@@ -121,8 +179,8 @@ class DecisionLog:
                 INSERT INTO decisions (
                     game, turn, actor, kind, situation, options, rung,
                     escalated_because, choice, primitives, legality,
-                    outcome, outcome_turn, created_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    outcome, outcome_turn, created_at, cheap_choice, cheap_rung
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     d.game,
@@ -139,6 +197,8 @@ class DecisionLog:
                     d.outcome,
                     d.outcome_turn,
                     d.created_at,
+                    d.cheap_choice,
+                    d.cheap_rung,
                 ),
             )
             new_id = cursor.lastrowid
