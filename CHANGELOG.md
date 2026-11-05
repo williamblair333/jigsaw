@@ -5,6 +5,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-11-05
+
+Logs move to schema 4 the first time v0.5.0 opens them. v0.2.0 through v0.4.0 refuse a
+schema-4 log, so after upgrading, don't move a pin back past v0.5.0. Every new `Ladder`
+argument defaults to the old behavior. `just contract` passed before the tag: 1612 Parley tests.
+
 ### Added
 - Model rungs can answer with an `Intent`. `Ladder(expanders=...)` maps verbs to expanders, whose
   `expand` returns primitives or None. Legality checks run on the expanded plan. On failure,
