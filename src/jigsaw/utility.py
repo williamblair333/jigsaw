@@ -15,6 +15,7 @@ import math
 
 from jigsaw.decision_log import Option
 from jigsaw.ladder import Request, Verdict
+from jigsaw.world import Blackboard
 
 Curve = Callable[[float], float]
 
@@ -73,6 +74,10 @@ class Consideration:
     name: str
     input: Callable[[Request, Option], float]
     curve: Curve
+    # A persona weight that steers this consideration (spec §5). With a blackboard, weight w
+    # raises the curve's value to the power 2w: 0.5 changes nothing, 0 switches it off, and 1
+    # makes it count more sharply.
+    persona: str | None = None
 
 
 class UtilityDecider:
@@ -89,16 +94,19 @@ class UtilityDecider:
         rung: int = 2,
         kinds: Collection[str] | None = None,
         min_score: float = 0.0,
+        blackboard: Blackboard | None = None,
     ) -> None:
         self.considerations = list(considerations)
         self.rung = rung
         self.kinds = set(kinds) if kinds is not None else None
         self.min_score = min_score
+        self.blackboard = blackboard
 
     def score(self, req: Request, option: Option) -> Option:
         """The option with its utility score, and each consideration's value in its note."""
         product = 1.0
         parts: list[str] = []
+        persona = self.blackboard.persona(req.actor) if self.blackboard is not None else {}
         for c in self.considerations:
             try:
                 raw = c.input(req, option)
@@ -111,6 +119,8 @@ class UtilityDecider:
                 return option.model_copy(
                     update={"score": 0.0, "note": f"{c.name} input is not a number ({raw})"}
                 )
+            if c.persona is not None and c.persona in persona:
+                value = value ** (2.0 * persona[c.persona])
             product *= value
             parts.append(f"{c.name}={value:.2f}")
         total = compensate(product, len(self.considerations))
