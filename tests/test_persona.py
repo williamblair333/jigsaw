@@ -109,6 +109,71 @@ def test_bad_persona_weights_are_refused_and_nothing_is_written() -> None:
     assert "weights must be numbers in 0..1" in v.reason
 
 
+def test_persona_refused_by_legality_writes_nothing() -> None:
+    bb = Blackboard()
+
+    def no_persona(req: Request, v: Verdict) -> str | None:
+        return "persona changes are locked this turn" if v.primitives[:1] and v.primitives[0]["op"] == "persona" else None
+
+    v = Ladder([PersonaModel({"aggression": 0.8})], Gate(), legality=no_persona,
+               expanders={"persona": PersonaExpander(bb)}).decide(_persona_req())
+
+    assert v.rung == 0 and bb.persona("venice") == {} and bb.persona_turn("venice") is None
+
+
+def test_accepted_persona_is_written_once() -> None:
+    class CountingBoard(Blackboard):
+        writes = 0
+
+        def set_persona(self, actor, weights, turn):  # type: ignore[override]
+            CountingBoard.writes += 1
+            super().set_persona(actor, weights, turn)
+
+    bb = CountingBoard()
+    Ladder([PersonaModel({"aggression": 0.8})], Gate(),
+           expanders={"persona": PersonaExpander(bb)}).decide(_persona_req())
+    assert CountingBoard.writes == 1
+
+
+def test_zero_weight_never_lifts_a_veto() -> None:
+    bb = Blackboard()
+    bb.set_persona("venice", {"legal": 0.0}, turn=4)
+    veto = UtilityDecider(blackboard=bb, considerations=[
+        Consideration("legal", lambda r, o: 0.0 if o.name == "attack" else 1.0, linear(), persona="legal"),
+    ])
+    v = veto.decide(_war_req())
+    assert v is not None and v.choice == "hold"
+    assert next(o for o in v.options if o.name == "attack").score == 0.0
+
+
+def test_negative_custom_curve_value_does_not_crash() -> None:
+    bb = Blackboard()
+    bb.set_persona("venice", {"x": 0.6}, turn=4)
+    # a pack's own curve that strays below 0 for "attack" (input 1.0)
+    d = UtilityDecider(blackboard=bb, considerations=[
+        Consideration("x", lambda r, o: AGGRO[o.name], lambda x: -0.5 if x > 0.5 else 0.7, persona="x"),
+    ])
+    v = d.decide(_war_req())
+    assert v is not None and v.choice == "hold"
+    assert all(isinstance(o.score, float) and 0.0 <= o.score <= 1.0 for o in v.options)
+
+
+def test_huge_and_non_number_weights_are_refused() -> None:
+    bb = Blackboard()
+    for bad in (10**400, "0.5", True, {"nested": 0.5}):
+        with pytest.raises(ValueError):
+            bb.set_persona("venice", {"w": bad}, turn=1)   # type: ignore[dict-item]
+
+
+def test_allowed_keys_refuse_unknown_weights() -> None:
+    bb = Blackboard()
+    ladder = Ladder([PersonaModel({"agression": 0.9})], Gate(),
+                    expanders={"persona": PersonaExpander(bb, allowed={"aggression", "piety"})})
+    v = ladder.decide(_persona_req())
+    assert v.rung == 0 and bb.persona("venice") == {}
+    assert "unknown persona weight 'agression'" in v.reason
+
+
 def test_persona_merges_with_earlier_weights() -> None:
     bb = Blackboard()
     bb.set_persona("venice", {"caution": 0.3}, turn=2)

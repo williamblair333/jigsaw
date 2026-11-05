@@ -6,7 +6,7 @@ final answer to the budget, and refuses an answer the budget can't cover, so it 
 Later decisions in the turn see only what remains.
 """
 
-from collections.abc import Mapping
+from collections.abc import Collection, Mapping
 import math
 import threading
 from typing import Any, cast
@@ -113,27 +113,43 @@ class Blackboard:
 def _is_weight(v: object) -> bool:
     if isinstance(v, bool) or not isinstance(v, (int, float)):
         return False
-    return math.isfinite(v) and 0.0 <= v <= 1.0
+    try:
+        return math.isfinite(v) and 0.0 <= v <= 1.0
+    except OverflowError:   # an int too large for a float
+        return False
 
 
 class PersonaExpander:
     """The expander for the `persona` intent verb: args {"weights": {"aggression": 0.8}}.
 
-    It writes the weights to the blackboard for the request's actor and returns one primitive,
-    {"op": "persona", ...}, which a pack can ignore or show. Invalid weights raise, so the
-    intent fails and nothing is written. The write happens when the plan is made, before the
-    ladder's legality check, so a pack that must veto persona changes should not register
-    this expander.
+    expand() only checks the weights and returns one primitive, {"op": "persona", ...}, which a
+    pack can ignore or show. Invalid weights, or names outside `allowed` when it's given,
+    raise, so the intent fails. The ladder calls commit() only for the answer that stands,
+    after the legality and budget checks, and that is when the weights reach the blackboard.
     """
 
-    def __init__(self, blackboard: Blackboard) -> None:
+    def __init__(self, blackboard: Blackboard, allowed: Collection[str] | None = None) -> None:
         self.blackboard = blackboard
+        self.allowed = set(allowed) if allowed is not None else None
 
-    def expand(self, req: Any, intent: Any, failure: str | None) -> list[dict[str, Any]] | None:
+    def _weights(self, intent: Any) -> dict[str, object]:
         weights = intent.args.get("weights")
         if not isinstance(weights, dict) or not weights:
             raise ValueError("a persona intent needs args {'weights': {name: number in 0..1}}")
-        raw = cast(dict[object, object], weights)   # model output: checked below, not trusted
+        raw = cast(dict[object, object], weights)   # model output: checked here, not trusted
         typed: dict[str, object] = {str(k): v for k, v in raw.items()}
-        self.blackboard.set_persona(req.actor, typed, turn=req.turn)
-        return [{"op": "persona", "actor": req.actor, "weights": typed}]
+        if self.allowed is not None:
+            unknown = sorted(set(typed) - self.allowed)
+            if unknown:
+                raise ValueError(f"unknown persona weight {unknown[0]!r}")
+        bad = {k: v for k, v in typed.items() if not _is_weight(v)}
+        if bad:
+            raise ValueError(f"persona weights must be numbers in 0..1: {bad}")
+        return typed
+
+    def expand(self, req: Any, intent: Any, failure: str | None) -> list[dict[str, Any]] | None:
+        return [{"op": "persona", "actor": req.actor, "weights": self._weights(intent)}]
+
+    def commit(self, req: Any, intent: Any) -> None:
+        """Write the weights; the ladder calls this once, for the answer that stands."""
+        self.blackboard.set_persona(req.actor, self._weights(intent), turn=req.turn)

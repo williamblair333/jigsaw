@@ -102,11 +102,14 @@ class UtilityDecider:
         self.min_score = min_score
         self.blackboard = blackboard
 
-    def score(self, req: Request, option: Option) -> Option:
+    def score(
+        self, req: Request, option: Option, persona: dict[str, float] | None = None
+    ) -> Option:
         """The option with its utility score, and each consideration's value in its note."""
         product = 1.0
         parts: list[str] = []
-        persona = self.blackboard.persona(req.actor) if self.blackboard is not None else {}
+        if persona is None:
+            persona = self.blackboard.persona(req.actor) if self.blackboard is not None else {}
         for c in self.considerations:
             try:
                 raw = c.input(req, option)
@@ -119,7 +122,9 @@ class UtilityDecider:
                 return option.model_copy(
                     update={"score": 0.0, "note": f"{c.name} input is not a number ({raw})"}
                 )
-            if c.persona is not None and c.persona in persona:
+            value = _clamp(value)   # a pack's own curve may stray outside 0..1
+            if c.persona is not None and c.persona in persona and value > 0.0:
+                # zero stays zero: a weight of 0 switches a consideration off, never a veto
                 value = value ** (2.0 * persona[c.persona])
             product *= value
             parts.append(f"{c.name}={value:.2f}")
@@ -131,7 +136,9 @@ class UtilityDecider:
             return None
         if not req.options or not self.considerations:
             return None
-        scored = [self.score(req, o) for o in req.options]
+        # one snapshot of the persona, so every option is judged under the same weights
+        persona = self.blackboard.persona(req.actor) if self.blackboard is not None else {}
+        scored = [self.score(req, o, persona) for o in req.options]
         if all(" raised " in o.note for o in scored):
             # a systematic bug, not a decision: raise so the ladder records it as a decider error
             raise RuntimeError(f"every option failed its considerations: {scored[0].note}")
