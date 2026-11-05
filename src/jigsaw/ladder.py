@@ -1,10 +1,14 @@
 """Decision ladder and gate for Jigsaw game AI."""
 
 from collections.abc import Sequence
+import logging
+import threading
 from typing import Any, Protocol, runtime_checkable
 from pydantic import BaseModel, Field
 
 from jigsaw.decision_log import Decision, DecisionLog, Option
+
+_log = logging.getLogger("jigsaw")
 
 
 class Request(BaseModel):
@@ -31,6 +35,8 @@ class Verdict(BaseModel):
     # the decision log's row id, set by Ladder.decide when it logs; the caller records the outcome
     # against it (DecisionLog.set_outcome) once the decision has been carried out
     decision_id: int | None = None
+    # deciders that raised or timed out on the way, treated as passing up; set by Ladder.decide
+    decider_errors: list[dict[str, Any]] = Field(default_factory=list)
 
 
 @runtime_checkable
@@ -114,17 +120,59 @@ class Gate:
 
 
 class Ladder:
-    """Decision ladder managing escalation through cheap and high-level deciders."""
+    """Decision ladder managing escalation through cheap and high-level deciders.
+
+    A decider that raises an Exception, or gives no answer within decider_timeout seconds,
+    counts as passing up. The failure is named in the verdict's reason and decider_errors,
+    written to the log row, and logged as a warning on the "jigsaw" logger.
+
+    decider_timeout is off by default, and then every decider runs on the calling thread.
+    When it is set, each decider runs on its own daemon thread. Python can't stop a thread,
+    so a decider that times out keeps running in the background until it returns. Give
+    network deciders their own client timeout too, and keep them safe to call from another
+    thread while an earlier call is still running.
+    """
 
     def __init__(
         self,
         deciders: Sequence[Decider] | list[Decider],
         gate: Gate,
         log: DecisionLog | None = None,
+        decider_timeout: float | None = None,
     ) -> None:
         self.deciders = list(deciders)
         self.gate = gate
         self.log = log
+        self.decider_timeout = decider_timeout
+
+    def _ask(self, decider: Decider, req: Request, errors: list[dict[str, Any]]) -> Verdict | None:
+        """Ask one decider. A raise or a timeout is recorded in errors and returns None."""
+        try:
+            if self.decider_timeout is None:
+                return decider.decide(req)
+            box: dict[str, Any] = {}
+
+            def run() -> None:
+                try:
+                    box["verdict"] = decider.decide(req)
+                except BaseException as exc:  # handed back to the calling thread below
+                    box["exc"] = exc
+
+            worker = threading.Thread(target=run, name=f"jigsaw-rung-{decider.rung}", daemon=True)
+            worker.start()
+            worker.join(self.decider_timeout)
+            if worker.is_alive():
+                raise TimeoutError(f"no answer within {self.decider_timeout}s")
+            if "exc" in box:
+                raise box["exc"]
+            return box.get("verdict")
+        except Exception as exc:
+            errors.append({"rung": decider.rung, "error": f"{type(exc).__name__}: {exc}"})
+            _log.warning(
+                "rung %d decider failed on %s/%s turn %d; treated as passing up",
+                decider.rung, req.game, req.kind, req.turn, exc_info=exc,
+            )
+            return None
 
     def decide(self, req: Request) -> Verdict:
         """Execute deciders and escalation gate to produce a final decision."""
@@ -133,10 +181,11 @@ class Ladder:
 
         cheap_deciders = [d for d in sorted_deciders if d.rung < escalate_rung]
         higher_deciders = [d for d in sorted_deciders if d.rung >= escalate_rung]
+        errors: list[dict[str, Any]] = []
 
         cheap_verdict: Verdict | None = None
         for decider in cheap_deciders:
-            v = decider.decide(req)
+            v = self._ask(decider, req, errors)
             if v is not None:
                 cheap_verdict = v
                 break
@@ -155,7 +204,7 @@ class Ladder:
         else:
             higher_verdict: Verdict | None = None
             for decider in higher_deciders:
-                v = decider.decide(req)
+                v = self._ask(decider, req, errors)
                 if v is not None:
                     higher_verdict = v.model_copy(
                         update={"reason": f"{gate_reason}; {v.reason}"}
@@ -175,6 +224,12 @@ class Ladder:
                     reason="no decider answered; the game's own AI keeps it",
                 )
 
+        if errors:
+            failed = "; ".join(f"rung {e['rung']} failed ({e['error']})" for e in errors)
+            final_verdict = final_verdict.model_copy(
+                update={"reason": f"{final_verdict.reason}; {failed}", "decider_errors": errors}
+            )
+
         if self.log is not None:
             # On an escalation, keep the cheap answer too, so agreement can be measured later.
             keep_cheap = bool(gate_reason) and cheap_verdict is not None
@@ -191,6 +246,7 @@ class Ladder:
                 escalated_because=gate_reason,
                 choice=final_verdict.choice,
                 primitives=final_verdict.primitives,
+                decider_errors=errors,
             )
             final_verdict = final_verdict.model_copy(update={"decision_id": self.log.record(decision)})
 

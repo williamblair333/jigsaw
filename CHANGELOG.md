@@ -14,6 +14,13 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   Opening a v0.1.0 log adds the two new columns and keeps every row. A file from a newer Jigsaw is
   refused with a clear error. A file that is already current opens without a write lock, so a
   read-only copy can be queried (STANDARDS `schema-versioned`).
+- A decider that fails no longer takes the decision down with it. If it raises an `Exception`,
+  the ladder treats it as passing up and moves to the next rung. `Ladder(decider_timeout=...)`
+  does the same for a decider that gives no answer in time. It's off by default; when it's set,
+  each decider runs on its own daemon thread. Each failure appears in the verdict's `reason`,
+  in a new `decider_errors` list on `Verdict` and in the log, and as a warning on the `jigsaw`
+  logger. `KeyboardInterrupt` and `SystemExit` still stop the program (STANDARDS
+  `decider-failure-contained`).
 
 - `PRODUCT.md`: core job, users, success measures, first-run path, non-goals, UI principles and
   a `verify:` block. The first-run gate passes in a clean `python:3.12-slim` container.

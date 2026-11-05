@@ -11,7 +11,7 @@ from pydantic import BaseModel, Field
 
 # The log file's layout version, stored in SQLite's PRAGMA user_version.
 # 1: v0.1.0's table. Those files never set user_version, so they read as 0.
-# 2: adds cheap_choice and cheap_rung.
+# 2: adds cheap_choice, cheap_rung and decider_errors.
 SCHEMA_VERSION = 2
 
 _CREATE_TABLE = """
@@ -32,7 +32,8 @@ CREATE TABLE IF NOT EXISTS decisions (
     outcome_turn INTEGER,
     created_at TEXT NOT NULL,
     cheap_choice TEXT,
-    cheap_rung INTEGER
+    cheap_rung INTEGER,
+    decider_errors TEXT NOT NULL DEFAULT '[]'
 )
 """
 
@@ -41,6 +42,7 @@ _MIGRATIONS: dict[int, list[str]] = {
     2: [
         "ALTER TABLE decisions ADD COLUMN cheap_choice TEXT",
         "ALTER TABLE decisions ADD COLUMN cheap_rung INTEGER",
+        "ALTER TABLE decisions ADD COLUMN decider_errors TEXT NOT NULL DEFAULT '[]'",
     ],
 }
 
@@ -81,6 +83,9 @@ class Decision(BaseModel):
     # the agreement rate between cheap and strong rungs.
     cheap_choice: str | None = None
     cheap_rung: int | None = Field(default=None, ge=0, le=7)
+    # Deciders that raised or timed out on this decision and were treated as passing up,
+    # as {"rung": int, "error": "ExceptionType: message"}.
+    decider_errors: list[dict[str, Any]] = Field(default_factory=list)
 
 
 class DecisionLog:
@@ -165,6 +170,7 @@ class DecisionLog:
             created_at=row["created_at"],
             cheap_choice=row["cheap_choice"],
             cheap_rung=row["cheap_rung"],
+            decider_errors=json.loads(row["decider_errors"]),
         )
 
     def record(self, d: Decision) -> int:
@@ -179,8 +185,9 @@ class DecisionLog:
                 INSERT INTO decisions (
                     game, turn, actor, kind, situation, options, rung,
                     escalated_because, choice, primitives, legality,
-                    outcome, outcome_turn, created_at, cheap_choice, cheap_rung
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    outcome, outcome_turn, created_at, cheap_choice, cheap_rung,
+                    decider_errors
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     d.game,
@@ -199,6 +206,7 @@ class DecisionLog:
                     d.created_at,
                     d.cheap_choice,
                     d.cheap_rung,
+                    json.dumps(d.decider_errors),
                 ),
             )
             new_id = cursor.lastrowid
