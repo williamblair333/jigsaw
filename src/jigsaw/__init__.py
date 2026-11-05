@@ -14,10 +14,18 @@ from jigsaw.ladder import (
 )
 from jigsaw.replay import ReplayReport, ReplayRow, replay_gate, replay_ladder
 from jigsaw.report import ConcordanceRow, concordance
+from jigsaw.utility import Consideration, UtilityDecider, compensate, linear, logistic, power, step
 
 __all__ = [
     "SCHEMA_VERSION",
     "ConcordanceRow",
+    "Consideration",
+    "UtilityDecider",
+    "compensate",
+    "linear",
+    "logistic",
+    "power",
+    "step",
     "Decider",
     "Decision",
     "DecisionLog",

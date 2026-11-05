@@ -51,6 +51,9 @@ class Verdict(BaseModel):
     legality: list[dict[str, Any]] = Field(default_factory=list[dict[str, Any]])
     # a model rung's goal, expanded into primitives by the pack's expander for its verb
     intent: Intent | None = None
+    # the options as this decider scored them (a utility rung sets these); when present, the
+    # gate's close-call check and the log use them instead of the request's own scores
+    options: list[Option] = Field(default_factory=list[Option])
 
 
 # A pack's legality check: return None when the verdict can be sent, or the reason it can't.
@@ -123,7 +126,8 @@ class Gate:
             return f"high stakes ({req.stakes:.2f})"
         if verdict is None:
             return "novelty: no rule matched"
-        norm_opts = normalise(req.options)
+        # a decider that scored the options itself (a utility rung) is judged on its own scores
+        norm_opts = normalise(verdict.options or req.options)
         scored = sorted(
             [opt.score for opt in norm_opts if opt.score is not None],
             reverse=True,
@@ -416,7 +420,10 @@ class Ladder:
             actor=req.actor,
             kind=req.kind,
             situation=req.situation,
-            options=normalise(req.options),
+            options=normalise(
+                cheap_verdict.options if cheap_verdict is not None and cheap_verdict.options
+                else final_verdict.options or req.options
+            ),
             rung=final_verdict.rung,
             escalated_because=gate_reason,
             choice=final_verdict.choice,
