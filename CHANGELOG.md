@@ -5,6 +5,14 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+- `tests/test_engine_game_agnostic.py` fails if engine code (`src/jigsaw`) names a game or
+  game pack. The one existing mention, a docstring, now reads "one thread per seat"
+  (STANDARDS `engine-game-agnostic`).
+- CI: `.gitea/workflows/ci.yml` runs the tests, the quickstart and `uv build` on Python 3.11,
+  3.12 and 3.13 for every PR and every push to `main`. Branch protection on `main` requires all
+  three to pass and blocks direct pushes (#21; STANDARDS `ci-on-every-pr`).
+
 ### Changed
 - A failed log write no longer loses the decision. If building or writing the row raises
   (disk full, a locked or closed file), `Ladder.decide` still returns the verdict. Its

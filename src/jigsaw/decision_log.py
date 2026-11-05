@@ -99,7 +99,7 @@ class DecisionLog:
     """SQLite-backed decision log for recording and querying game decisions.
 
     Safe to share between threads: a game loop that decides for several factions at once
-    (Parley answers each seat on its own thread) uses one log. One connection, one lock.
+    (say, one thread per seat) uses one log. One connection, one lock.
     """
 
     def __init__(self, path: str | Path) -> None:

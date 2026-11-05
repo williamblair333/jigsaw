@@ -80,8 +80,8 @@ standards:
     area: release
     bar: Gitea Actions runs `just test` on Python 3.11, 3.12 and 3.13 for every PR, and merging needs it green
     why: a library with a pinned consumer can't rely on someone remembering to run tests
-    status: open
-    evidence: no workflow file in the repo
+    status: done
+    evidence: .gitea/workflows/ci.yml
   - id: first-run-proven
     area: release
     bar: The PRODUCT.md verify block passes in a clean container before every tag
@@ -98,8 +98,8 @@ standards:
     area: architecture
     bar: A test fails if src/jigsaw names a game or a game pack
     why: the engine's value is reuse across packs; one leaked name turns into ten
-    status: partial
-    evidence: CLAUDE.md (the rule is written down, not checked; decision_log.py's docstring already names Parley)
+    status: done
+    evidence: tests/test_engine_game_agnostic.py
   - id: intent-contract
     area: game AI
     bar: Model rungs return a structured intent that deterministic rungs expand into primitives; a model never emits raw game ids
