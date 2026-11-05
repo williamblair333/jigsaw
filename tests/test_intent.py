@@ -142,6 +142,60 @@ def test_expander_that_raises_counts_as_a_failed_plan() -> None:
     assert "expander raised KeyError: 'Milan'" in v.reason
 
 
+def test_empty_plan_counts_as_no_plan() -> None:
+    class Empty:
+        def expand(self, req: Request, intent: Intent, failure: str | None) -> list[dict[str, Any]] | None:
+            return []
+
+    v = Ladder([Cheap(), Model(_take())], Gate(), expanders={"take": Empty()}).decide(_req())
+
+    assert v.rung == 2
+    assert "the expander returned an empty plan" in v.reason
+
+
+def test_intent_without_any_expanders_is_refused() -> None:
+    v = Ladder([Cheap(), Model(_take())], Gate()).decide(_req())
+
+    assert v.rung == 2
+    assert "an intent needs an expander, and none are configured" in v.reason
+
+
+def test_successful_replan_leaves_a_clean_reason() -> None:
+    ladder = Ladder([Cheap(), Model(_take())], Gate(),
+                    expanders={"take": TakeExpander(bad_road="mountain pass")},
+                    legality=no_mountain_pass)
+
+    v = ladder.decide(_req())
+
+    assert v.rung == 7 and "illegal" not in v.reason
+
+
+def test_every_failed_attempt_is_kept() -> None:
+    class RaisesThenNone:
+        def __init__(self) -> None:
+            self.n = 0
+
+        def expand(self, req: Request, intent: Intent, failure: str | None) -> list[dict[str, Any]] | None:
+            self.n += 1
+            if self.n == 1:
+                raise KeyError("Milan")
+            return None
+
+    v = Ladder([Cheap(), Model(_take())], Gate(), expanders={"take": RaisesThenNone()}).decide(_req())
+
+    attempts = [c for c in v.legality if "attempt" in c]
+    assert [(c["attempt"], c["reason"]) for c in attempts] == [
+        (1, "expander raised KeyError: 'Milan'"),
+        (2, "the expander found no plan"),
+    ]
+
+
+def test_model_rung_with_neither_intent_nor_primitives_gets_a_clear_message() -> None:
+    bare = Verdict(choice="hmm", rung=7, reason="model")
+    v = Ladder([Cheap(), Model(bare)], Gate(), expanders={"take": TakeExpander()}).decide(_req())
+    assert "model rungs answer with an intent; this answer had none" in v.reason
+
+
 def test_schema_4_adds_the_intent_column_to_a_v3_file(tmp_path: Path) -> None:
     path = tmp_path / "v3.db"
     DecisionLog(path).close()

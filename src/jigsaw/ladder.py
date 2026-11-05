@@ -204,13 +204,22 @@ class Ladder:
         v = self._call(decider, req, errors)
         if v is None:
             return None
-        if self.expanders is not None:
-            if decider.rung >= self.gate.config.escalate_rung and (v.intent is None or v.primitives):
+        if self.expanders is not None and decider.rung >= self.gate.config.escalate_rung:
+            if v.primitives:
                 self._refuse(decider, req, v, "model rungs answer with an intent, not primitives",
                              checks)
                 return None
-            if v.intent is not None:
-                return self._expand(decider, req, v, v.intent, checks)
+            if v.intent is None:
+                self._refuse(decider, req, v,
+                             "model rungs answer with an intent; this answer had none", checks)
+                return None
+        if v.intent is not None:
+            if self.expanders is None:
+                self._refuse(decider, req, v,
+                             "an intent needs an expander, and none are configured", checks,
+                             intent_id=v.intent.id)
+                return None
+            return self._expand(decider, req, v, v.intent, checks)
         if self.legality is None:
             return v
         refusal = self._check(req, v)
@@ -233,23 +242,28 @@ class Ladder:
             return None
         failure: str | None = None
         for attempt in (1, 2):
+            tag = {"rung": decider.rung, "choice": v.choice, "intent_id": intent.id,
+                   "attempt": attempt}
             try:
                 primitives = expander.expand(req, intent, failure)
             except Exception as exc:
+                primitives = None
                 failure = f"expander raised {type(exc).__name__}: {exc}"
-                continue
-            if primitives is None:
-                failure = "the expander found no plan"
-                continue
-            planned = v.model_copy(update={"primitives": primitives})
-            refusal = self._check(req, planned)
-            tag = {"intent_id": intent.id, "attempt": attempt}
-            if refusal is None:
-                checks.append({"rung": decider.rung, "choice": v.choice, "legal": True, **tag})
-                return planned
-            checks.append({"rung": decider.rung, "choice": v.choice, "legal": False,
-                           "reason": refusal, **tag})
-            failure = refusal
+            else:
+                if primitives is None:
+                    failure = "the expander found no plan"
+                elif not primitives:
+                    primitives = None
+                    failure = "the expander returned an empty plan"
+            if primitives is not None:
+                planned = v.model_copy(update={"primitives": primitives})
+                refusal = self._check(req, planned)
+                if refusal is None:
+                    checks.append({**tag, "legal": True})
+                    return planned
+                failure = refusal
+            # every failed attempt is kept; only the final refusal goes into the reason text
+            checks.append({**tag, "legal": False, "reason": failure})
         self._refuse(decider, req, v, f"intent {intent.verb} failed after replanning: {failure}",
                      checks, intent_id=intent.id)
         return None
@@ -340,7 +354,8 @@ class Ladder:
                 update={"reason": f"{final_verdict.reason}; {failed}", "decider_errors": errors}
             )
 
-        refused = [c for c in checks if not c["legal"]]
+        # per-attempt entries of an intent stay in legality; the final refusal speaks for them
+        refused = [c for c in checks if not c["legal"] and "attempt" not in c]
         if refused:
             text = "; ".join(f"rung {c['rung']} illegal ({c['reason']})" for c in refused)
             final_verdict = final_verdict.model_copy(
