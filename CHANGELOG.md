@@ -5,6 +5,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-11-05
+
+No breaking changes, and the log stays at schema 3. Every new `Ladder` argument defaults to the
+old behavior. `just contract` passed before the tag: 1596 Parley tests against this release.
+
 ### Added
 - The package ships `py.typed`, so a type checker reads Jigsaw's annotations in a project that
   imports it. Pyright runs in strict mode in CI on all three Pythons, and locally with
