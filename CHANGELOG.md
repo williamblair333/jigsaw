@@ -5,6 +5,13 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-11-05
+
+The three STANDARDS ideas are built and can be tested on a campaign log: skip-lot gating,
+shadow audits and holdings. Logs move to schema 5 the first time v0.9.0 opens them, and v0.5.0
+through v0.8.0 refuse a schema-5 log. `just contract` passed before the tag: 1612 Parley tests.
+Parley's pin stays at v0.8.0 until the Parley side moves it.
+
 ### Added
 - `jigsaw.skip_lot.SkipLotGate` skips escalations after `streak` agreements in a row for a kind
   of decision in one game (only close calls and cadence reviews count), samples audits, and
