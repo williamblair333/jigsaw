@@ -1,37 +1,41 @@
 # Handoff
 
-## 2026-11-05: the learning-loop gaps, v0.2.0, replay and concordance
+## 2026-11-05: STANDARDS gaps closed through v0.4.0; Parley on v0.4.0
 
-**State:** four STANDARDS gaps closed and merged.
-- `log-both-verdicts` and `schema-versioned` (#15).
-- `decider-failure-contained` (#16).
-- `full-request-replayable` (#18).
-- `gate-concordance-report` is on branch `feat/gate-concordance-report` and goes to PR after
-  its review.
+**State:** `main` is at v0.4.0, tagged on Gitea and the GitHub mirror. Parley's `main` pins it
+(bill/mtw2#371). 92 tests pass, and `pyright` strict reports 0 errors. Every standard in
+STANDARDS.md is done except two:
+- `first-run-proven` is partial. CI runs the quickstart, but the PRODUCT.md verify block isn't
+  run in a clean container before each tag.
+- `intent-contract` is open. It's spec piece 5: model rungs return intents, deterministic rungs
+  expand them, and models never emit raw game ids. It's a design task, so start with
+  brainstorming and the spec.
 
-The log is at schema version 3. Each version upgrade runs in one transaction when a log is
-opened (`_MIGRATIONS` in `decision_log.py`). A log that is already current opens without a
-write lock. v0.1.0 has no version check, so it can still use a newer file (checked against
-a v2 file). v0.2.0 refuses any file newer than schema 2. So once Parley opens its logs with
-v0.3.0, moving its pin back to v0.2.0 makes those logs unreadable until it moves forward again.
+Releases today:
+- v0.2.0: both verdicts in the log, the schema version, failing deciders pass up.
+- v0.3.0: the stored request, `jigsaw replay`, `jigsaw concordance`.
+- v0.4.0: the legality check, a failed log write keeps the verdict, WAL, `py.typed`, CI, the
+  game-name test, `just contract`, the public API and deprecation policy.
 
-New command line: `jigsaw replay LOG --gate k=v,...` (no model calls) or `--ladder mod:factory`,
-and `jigsaw concordance LOG`.
+**How the repo runs now:**
+- Branch protection on `main`: no direct pushes. A PR merges only with
+  `ci / test (3.11|3.12|3.13)` green, and CI runs pyright, pytest, the quickstart and `uv build`.
+- Release steps are in CLAUDE.md. `just contract` (Parley's tests against this checkout) comes
+  before every tag.
+- Gitea's merge API once answered HTTP 405 on a merge that had gone through. Check the PR's
+  `merged` field, not the status code.
+- The log is at schema 3. v0.2.0 refuses a schema-3 log; v0.1.0 has no check and reads it.
+  So never move Parley's pin back to v0.2.0.
 
-**Released:** v0.2.0 (#17; tag on Gitea and the GitHub mirror). It holds #15 and #16.
-Replay and concordance are unreleased and go out as v0.3.0.
+**Offloading** (memory: offload-what-works):
+- agy edit tasks work in a worktree with a fixed brief and no commands. The docs in #27 came
+  out that way.
+- agy reviews time out at 300 s. Use a code-reviewer subagent for reviews.
+- agy can't run `uvx`, so run checks yourself.
+- Ollama and Heretic were down all session ("503 Loading model", unreachable).
 
-**Parley:** PR bill/mtw2#363 moves its pin to v0.2.0, and 1587 Parley tests pass with it.
-Nobody has merged it yet; the Parley side decides when, since a campaign may be mid-turn.
-After v0.3.0, bump the pin again.
-
-**Reviews:** Gemini (`ask_agy`, review task) timed out at 300 s with no output on both review
-attempts. Claude code-reviewer subagents did the reviews instead and found real bugs in
-replay, all fixed with tests.
-
-**Next:** tag v0.3.0. Then work the next open gaps in STANDARDS.md, in order:
-`log-write-failure-contained` (a failed log write must not lose the verdict), `ci-on-every-pr`,
-`consumer-contract-test`.
+**Next:** `first-run-proven`. Run the PRODUCT.md verify block in a clean `python:3.12-slim`
+container, as a release step or a CI job. Then `intent-contract`, which needs a design first.
 
 ## 2026-11-04: product brief and expert bar
 
