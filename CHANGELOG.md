@@ -5,6 +5,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-11-05
+
+No breaking changes, and the log stays at schema 4. `just contract` passed before the tag: 1612
+Parley tests.
+
 ### Added
 - `Request.trace` lists what already failed on a decision, oldest first. A caller can pass its own
   entries, like a step the game rejected, and they come first. A rung asked after a failure
