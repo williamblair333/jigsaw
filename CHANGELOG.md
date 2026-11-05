@@ -12,6 +12,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - CI: `.gitea/workflows/ci.yml` runs the tests, the quickstart and `uv build` on Python 3.11,
   3.12 and 3.13 for every PR and every push to `main`. Branch protection on `main` requires all
   three to pass and blocks direct pushes (#21; STANDARDS `ci-on-every-pr`).
+- `just contract [CONSUMER]` runs a consumer's test suite (default: Parley) against this
+  checkout before a tag. It works in a throwaway worktree of the consumer's `main`, swaps in
+  this Jigsaw, and prints where Jigsaw was installed from as proof. The consumer's own
+  checkout is never touched. First run: 1596 Parley tests pass (STANDARDS
+  `consumer-contract-test`).
 
 ### Changed
 - A failed log write no longer loses the decision. If building or writing the row raises

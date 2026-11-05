@@ -92,8 +92,8 @@ standards:
     area: release
     bar: Before a tag, Parley's test suite runs against the candidate Jigsaw commit
     why: the one consumer is the real API contract; finding a break after the pin bump is late
-    status: open
-    evidence: Parley only meets a change after the tag and its pin bump
+    status: done
+    evidence: scripts/contract-test.sh
   - id: engine-game-agnostic
     area: architecture
     bar: A test fails if src/jigsaw names a game or a game pack

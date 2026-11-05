@@ -176,15 +176,19 @@ Alpha, version 0.1.0. The API may change before 1.0.
   War*, uses them.
 - **Designed, not built:** a gate that learns from the log, genre templates, and *distillation*
   (turning repeated model answers into rules). See `docs/specs/2026-10-26-jigsaw-design.md`.
-- **Known gaps:** listed and ranked in `STANDARDS.md`. The first one: Parley's tests don't
-  run against a Jigsaw change until after it's tagged and Parley's pin moves.
+- **Known gaps:** listed and ranked in `STANDARDS.md`. The first one: the ladder logs a
+  legality field but never runs a legality check, so an illegal verdict is still returned.
 - **Out of scope:** real-time games, and calling model providers. Your deciders do that.
 
 ## Work on it
 
 ```bash
-just setup   # install dependencies
-just test    # run the tests
+just setup      # install dependencies
+just test       # run the tests
+just contract   # run Parley's tests against this checkout (before a release)
 ```
+
+CI runs the tests on Python 3.11, 3.12 and 3.13 for every PR, and `main` accepts only PRs with
+all three green.
 
 License: GPL-3.0-or-later.
