@@ -1,5 +1,51 @@
 # Handoff
 
+## 2026-11-06: the plan for Parley's cheaper decider, ready for the ruler track
+
+**Waiting on:** mtw2-24 messages when the ruler track starts (set_tax rule, turn gate, pin move).
+Bill asked that we then help mtw2 add a cheaper decider and store requests. The code goes in
+Parley; this repo only helps, and fixes the engine if something is missing.
+
+**What the live log shows (read-only sqlite on tc-vmh-03, 2026-11-06 08:50):**
+`parley_turns/scratch.decisions.db` is schema 4, 486 rows, turns 5–37. Every row is rung 7, 483 with
+"asked every turn, no gate yet". `cheap_choice` is null in all of them, and `request` is set in
+only 3. `scratch.run9` has the same gaps (1,842 rows). `set_tax` is the most common kind (113 rows).
+Never open a live Parley log with Jigsaw: `DecisionLog(path)` migrates it, and a v0.9.0 migration
+makes Parley v0.8.0 refuse its own log. Read it with `sqlite3` `?mode=ro`, or work on a copy.
+
+**Why:** `parley/decisions.py` `record_turn` builds each `Decision` by hand at rung 7 and never goes
+through a `Ladder`. So no row gets a request or a cheap answer. The 3 rows that do have one come
+from popups, which use a Ladder (`parley/popups.py` `Popups._ladder`).
+
+**The plan (set_tax first):**
+1. After the ruler answers a turn, build one `Request(kind="set_tax")` for each of the faction's
+   settlements. Its options are the tax levels and its context the inputs the rule needs
+   (treasury need, the settlement's public order and its current level). Skip a settlement whose
+   public order is unknown.
+2. Run it through `Ladder([TAX_RULE, RulerAnswer(orders)], gate, log)`. `TAX_RULE` is a
+   `UtilityDecider(kinds={"set_tax"})` at rung 2, shaped like `TAX` in `tests/test_utility.py`
+   (a need consideration and a calm one), plus Parley's existing high-tax/low-order warning
+   (`steward.tax_warning`). `RulerAnswer` is a rung-7 decider that answers with the level the ruler
+   already chose for that settlement this turn. No set_tax order for it means the current level.
+   So the model call isn't repeated.
+3. **Observe first.** Set the gate to escalate every set_tax request (`cadence=1`, see below), so the ruler's answer still
+   stands and the game plays exactly as now. Each row then has a request, the rule's
+   `cheap_choice` and the ruler's choice. That's what `jigsaw concordance` and
+   `jigsaw replay --skip-lot` need.
+4. `record_turn` stops writing set_tax rows (the ladder writes them now, so they'd be logged twice).
+   Other kinds keep the hand-built path until each has its own rule.
+5. Once concordance shows how often the rule and the ruler agree, a second change lets the gate
+   decide: where rung 2 stands, the ruler's set_tax for that settlement is dropped. That changes
+   behavior, so it needs its own PR and QA cases.
+6. Pin Parley to v0.9.0 with the first step if it wants `Ladder(shadow_rate=)` and holdings. The move
+   to schema 5 is one way (see the State notes below).
+
+**The observe gate needs no engine change:** `Gate(GateConfig(cadence=1))` escalates every request
+with `turn > 0` as "cadence review" (`Gate.check`, `ladder.py`), and Parley's turns start at 5. Don't
+use `stakes_threshold=0` for this. It escalates everything too, but it logs "high stakes", which
+`SkipLotGate` never samples. Check once it starts that a rung-7 decider that never fails still
+fills `cheap_choice` on escalation (`tests/test_both_verdicts.py`).
+
 ## 2026-11-05: every STANDARDS item done; v0.9.0 tagged; Parley on v0.8.0
 
 **State:**
