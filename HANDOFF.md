@@ -28,7 +28,7 @@ from popups, which use a Ladder (`parley/popups.py` `Popups._ladder`).
    (`steward.tax_warning`). `RulerAnswer` is a rung-7 decider that answers with the level the ruler
    already chose for that settlement this turn. No set_tax order for it means the current level.
    So the model call isn't repeated.
-3. **Observe first.** Set the gate to escalate every set_tax request, so the ruler's answer still
+3. **Observe first.** Set the gate to escalate every set_tax request (`cadence=1`, see below), so the ruler's answer still
    stands and the game plays exactly as now. Each row then has a request, the rule's
    `cheap_choice` and the ruler's choice. That's what `jigsaw concordance` and
    `jigsaw replay --skip-lot` need.
@@ -40,9 +40,11 @@ from popups, which use a Ladder (`parley/popups.py` `Popups._ladder`).
 6. Pin Parley to v0.9.0 with the first step if it wants `Ladder(shadow_rate=)` and holdings. The move
    to schema 5 is one way (see the State notes below).
 
-**Engine checks to make here when it starts:** whether a gate setting already escalates every
-request of a kind (if not, that's a small Jigsaw change with a test). Also check that a rung-7
-decider that never fails still fills `cheap_choice` on escalation (`tests/test_both_verdicts.py`).
+**The observe gate needs no engine change:** `Gate(GateConfig(cadence=1))` escalates every request
+with `turn > 0` as "cadence review" (`Gate.check`, `ladder.py`), and Parley's turns start at 5. Don't
+use `stakes_threshold=0` for this. It escalates everything too, but it logs "high stakes", which
+`SkipLotGate` never samples. Check once it starts that a rung-7 decider that never fails still
+fills `cheap_choice` on escalation (`tests/test_both_verdicts.py`).
 
 ## 2026-11-05: every STANDARDS item done; v0.9.0 tagged; Parley on v0.8.0
 
