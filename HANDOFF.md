@@ -35,7 +35,8 @@
 - Wait for mtw2's message, then help it adopt the pieces: a `UtilityDecider` for set_tax, `Budget` for the turn's gold, `legality=` from `validate.py`, and expanders for its first intents. Engine changes stay here, and pack code stays in Parley.
 - Spec §2's derived maps and compact summaries, and §7 distillation, wait for Parley data: distillation needs a full campaign logged with v0.5.0 or later.
 - Once Parley moves to v0.9.0 and logs a campaign: `jigsaw replay LOG --gate cadence=0 --skip-lot streak=20,sample=0.1` (skip-lot), `jigsaw concordance LOG` with shadow_rate set in Parley (shadow audit), and `jigsaw holdings LOG` (holdings). Each idea's test and kill criteria are in STANDARDS.md.
-- No Parley pin bumps unless mtw2 asks. Tell it v0.9.0 exists and what moving to it changes (schema 5).
+- No Parley pin bumps unless mtw2 asks. mtw2-24 was told about v0.9.0 and the one-way schema-5 move. It replied that the pin stays at v0.8.0 until the ruler-track work starts, and it will message this repo then. It gave no other reason for waiting.
+- SkipLotGate never skips the reasons "human", "high stakes" or "novelty" (`skip_lot.py` `_NEVER_SKIP`). Every other escalation, cadence included, can be sampled once a streak is reached.
 
 ## 2026-11-04: product brief and expert bar
 
